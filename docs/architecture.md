@@ -105,3 +105,29 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   renders Markdown with raw HTML disabled (SEC-02).
 - **Lists** load authors with a join and tags with one extra `IN` query, so a page costs
   the same number of SQL queries whatever its size (a test checks this).
+
+## Frontend (Stage 3)
+
+- **Routing:** `react-router` in declarative mode (`<Routes>` in `src/App.tsx`). Pages that
+  need an account are wrapped in `<RequireAuth>`, which sends guests to
+  `/signin?next=…`. `safeNext()` only accepts same-site paths, so `?next=` cannot be used
+  to redirect people to another site.
+- **Data:** `src/api/*.ts` has one small function per endpoint on top of `api()`, which
+  throws `ApiError` (status, code, message, field errors) for non-2xx answers. Pages load
+  data with `useAsync(key, load)`: it tracks loading / success / error, cancels outdated
+  requests and offers `reload()` for retry buttons. No global state library.
+- **Who is signed in:** `AuthProvider` asks `/auth/me` once and shares the result with
+  `useAuth()`. Signing out navigates and clears the user in one transition, so protected
+  pages do not flash the sign-in form.
+- **Markdown (SEC-02):** `components/Markdown.tsx` uses `react-markdown` with `skipHtml`
+  (raw HTML is dropped, never executed), its default URL filter (no `javascript:` links),
+  `rel="nofollow ugc"` on links, and images shown as links so authors cannot track readers
+  with remote images.
+- **Forms** never clear what the user typed when the server fails, and show field-level
+  messages from 422 responses.
+- **Styling:** Tailwind CSS with the typography plugin for long-form text; colours are
+  theme tokens in `src/index.css`. No component library.
+- **Accessibility:** skip link, semantic headings and landmarks, labelled inputs,
+  `role="status"`/`role="alert"` for async messages, visible focus outlines.
+- **SEO:** each page sets `<title>`, the meta description and Open Graph title/description.
+  Server-side rendering and a sitemap are optional per the spec and not included.

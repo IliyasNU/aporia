@@ -8,7 +8,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | 0     | Foundation: repo layout, settings, Compose, migrations, CI    | —                         | **In review** |
 | 1     | Accounts: register/login/logout, sessions, profile, interests | AUTH-01, AUTH-02, USER-01 | **In review** |
 | 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | **In review** |
-| 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | Not started   |
+| 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | **In review** |
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | Not started   |
 | 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | Not started   |
 | 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | Not started   |
@@ -48,3 +48,19 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 - One visibility rule (`app/services/visibility.py`) used by every public query.
 - Not yet: `sort=popular` needs bookmarks and arrives with Stage 4; until then `sort`
   accepts only `latest`.
+
+## Stage 3: what exists
+
+Screens (React Router, all wired to the real API):
+
+| Route                  | Screen                                                                                                  | Requirement |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------- |
+| `/`                    | Essay list with search, popular tags, pagination, write CTA                                             | FE-01       |
+| `/articles/:slug`      | Essay with safe Markdown, author, date, tags; edit link for the author                                  | FE-02       |
+| `/authors/:handle`     | Public profile with bio, website and published essays                                                   | FE-03       |
+| `/write`, `/write/:id` | Editor: title, summary, tags, Markdown with preview, save, publish, unpublish, delete with confirmation | FE-04       |
+| `/account`             | Own essays in every status, profile, interests, sign out                                                | FE-05       |
+| `/signin`, `/signup`   | Forms with field errors and safe `?next=` redirects                                                     | AUTH-01     |
+
+- Loading, empty and error states (with retry) on every data view; checked at 360 px.
+- Follow, bookmark and comment controls arrive with Stage 4; the newsletter form with Stage 5.
