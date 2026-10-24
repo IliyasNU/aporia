@@ -1,5 +1,5 @@
-# Local development / demo stack: PostgreSQL, migrations, API and web.
-# Usage: docker compose up --build   →   http://localhost:8080
+# Local development / demo stack: PostgreSQL, migrations, API, email worker, web, Mailpit.
+# Usage: docker compose up --build   →   http://localhost:8080  (emails: http://localhost:8025)
 # Every value has a working default; override them in a root .env (see .env.example).
 
 x-backend-env: &backend-env
@@ -9,6 +9,16 @@ x-backend-env: &backend-env
   # Browser origins allowed to send POST/PATCH/PUT/DELETE (CSRF check): the web app and Swagger UI.
   TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:${WEB_PORT:-8080},http://127.0.0.1:${WEB_PORT:-8080},http://localhost:${API_PORT:-8000},http://127.0.0.1:${API_PORT:-8000}}
   SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-14}
+  # Signs unsubscribe links. The API refuses to start in production with this placeholder.
+  SECRET_KEY: ${SECRET_KEY:-dev-only-secret-change-me}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:${WEB_PORT:-8080}}
+  # Mailpit catches every email locally; set real SMTP values for production.
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+  MAIL_FROM: ${MAIL_FROM:-Aporia <no-reply@aporia.localhost>}
 
 services:
   db:
@@ -47,6 +57,23 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Sends queued "new essay" emails (one process, polls the email_jobs table).
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment: *backend-env
+    healthcheck:
+      # Healthy while the worker loop keeps touching its heartbeat file.
+      test: ["CMD", "python", "-m", "app.worker.healthcheck"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   web:
     build: ./frontend
     ports:
@@ -54,6 +81,14 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
+
+  # Development only: an SMTP server that keeps every email in a web inbox.
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025" # web inbox
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP, for a backend running outside Docker
     restart: unless-stopped
 
 volumes:

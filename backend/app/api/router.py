@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import articles, auth, authors, health, me, moderation, social, tags
+from app.api import articles, auth, authors, health, me, moderation, newsletter, social, tags
 
 API_PREFIX = "/api/v1"
 
@@ -13,3 +13,4 @@ api_router.include_router(articles.router)
 api_router.include_router(tags.router)
 api_router.include_router(social.router)
 api_router.include_router(moderation.router)
+api_router.include_router(newsletter.router)

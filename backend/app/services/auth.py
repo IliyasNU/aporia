@@ -12,8 +12,8 @@ from app.core.errors import AppError
 from app.core.security import (
     burn_password_check_time,
     hash_password,
-    hash_session_token,
-    new_session_token,
+    hash_token,
+    new_token,
     password_needs_rehash,
     verify_password,
 )
@@ -73,11 +73,9 @@ def authenticate(db: Session, data: LoginRequest) -> User:
 
 def create_session(db: Session, user: User) -> str:
     """Store a new session and return the raw token for the cookie (never stored)."""
-    token = new_session_token()
+    token = new_token()
     expires_at = datetime.now(UTC) + timedelta(days=get_settings().session_ttl_days)
-    db.add(
-        UserSession(user_id=user.id, token_hash=hash_session_token(token), expires_at=expires_at)
-    )
+    db.add(UserSession(user_id=user.id, token_hash=hash_token(token), expires_at=expires_at))
     db.commit()
     return token
 
@@ -86,7 +84,7 @@ def find_active_session(db: Session, token: str) -> UserSession | None:
     """The session for this cookie token, unless it is unknown, revoked or expired."""
     return db.scalar(
         select(UserSession).where(
-            UserSession.token_hash == hash_session_token(token),
+            UserSession.token_hash == hash_token(token),
             UserSession.revoked_at.is_(None),
             UserSession.expires_at > datetime.now(UTC),
         )

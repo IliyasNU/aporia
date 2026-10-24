@@ -153,3 +153,33 @@ def signed_in(
 
 def me(client: TestClient) -> dict[str, object]:
     return client.get("/api/v1/auth/me").json()
+
+
+class Outbox(list):  # type: ignore[type-arg]
+    """Emails "sent" during a test, plus a switch to simulate SMTP failures."""
+
+    failure: Exception | None = None
+
+    def send(self, message: object) -> None:
+        if self.failure is not None:
+            raise self.failure
+        self.append(message)
+
+
+@pytest.fixture
+def outbox(monkeypatch: pytest.MonkeyPatch) -> Outbox:
+    from app.services import mailer
+
+    box = Outbox()
+    monkeypatch.setattr(mailer, "send", box.send)
+    return box
+
+
+def link_token(message: object, kind: str) -> str:
+    """The token from a '/newsletter/<kind>#token=…' link in an email body."""
+    import re
+
+    body = message.get_content()  # type: ignore[attr-defined]
+    match = re.search(rf"/newsletter/{kind}#token=([\w-]+)", body)
+    assert match, body
+    return match.group(1)

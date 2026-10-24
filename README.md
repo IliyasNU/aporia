@@ -4,10 +4,9 @@ A publishing platform for philosophical essays: authors publish, readers follow 
 subscribe to email updates and get transparent, explainable recommendations.
 Built with FastAPI, React and PostgreSQL.
 
-> **Status: Stage 4 (Social).** Accounts, publishing, search, follows with a Following
-> feed, bookmarks, comments, reports and admin moderation work in the browser. Email
-> subscriptions and recommendations are **not implemented yet**. See
-> [docs/roadmap.md](docs/roadmap.md).
+> **Status: Stage 5 (Email).** Accounts, publishing, search, follows, bookmarks, comments,
+> moderation and double opt-in email subscriptions with a sending worker work end to end.
+> Recommendations are **not implemented yet**. See [docs/roadmap.md](docs/roadmap.md).
 
 ## Quick start (Docker)
 
@@ -22,9 +21,11 @@ docker compose up --build
 | http://localhost:8080               | Web app (React SPA served by nginx) |
 | http://localhost:8000/api/v1/health | API liveness check (API + database) |
 | http://localhost:8000/api/v1/docs   | OpenAPI / Swagger UI                |
+| http://localhost:8025               | Mailpit: every email the app sends  |
 
-Compose starts four services: `db` (PostgreSQL 16), `migrate` (runs `alembic upgrade head`
-once and exits), `api` (FastAPI) and `web` (nginx serving the SPA and proxying `/api`).
+Compose starts six services: `db` (PostgreSQL 16), `migrate` (runs `alembic upgrade head`
+once and exits), `api` (FastAPI), `worker` (sends queued emails), `web` (nginx serving the
+SPA and proxying `/api`) and `mailpit` (a local SMTP server with a web inbox; development only).
 All ports are bound to `127.0.0.1` only. To change ports or the database password, copy
 `.env.example` to `.env` and edit it.
 
@@ -46,19 +47,23 @@ cd backend
 uv sync                          # create .venv and install dependencies
 uv run alembic upgrade head      # apply migrations
 uv run uvicorn app.main:app --reload
+uv run python -m app.worker      # in a second terminal: sends queued emails
 ```
 
 The API is now on http://localhost:8000. Settings come from environment variables (or
 `backend/.env`):
 
-| Variable            | Default                                                                       |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `DATABASE_URL`      | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia`                    |
-| `APP_ENV`           | `development` (`development`, `test` or `production`)                         |
-| `LOG_LEVEL`         | `INFO`                                                                        |
-| `TRUSTED_ORIGINS`   | local web, Vite and Swagger origins (comma-separated list, CSRF check)        |
-| `SESSION_TTL_DAYS`  | `14`                                                                          |
-| `TEST_DATABASE_URL` | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia_test` (pytest only) |
+| Variable                 | Default                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia`                                         |
+| `APP_ENV`                | `development` (`development`, `test` or `production`)                                              |
+| `LOG_LEVEL`              | `INFO`                                                                                             |
+| `TRUSTED_ORIGINS`        | local web, Vite and Swagger origins (comma-separated list, CSRF check)                             |
+| `SESSION_TTL_DAYS`       | `14`                                                                                               |
+| `SECRET_KEY`             | dev placeholder (must be 32+ random characters in production)                                      |
+| `PUBLIC_BASE_URL`        | `http://localhost:8080` (used in email links)                                                      |
+| `SMTP_HOST`, `SMTP_PORT` | `localhost`, `1025` (Mailpit); also `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM` |
+| `TEST_DATABASE_URL`      | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia_test` (pytest only)                      |
 
 New migration after changing a model:
 
@@ -80,34 +85,36 @@ All endpoints live under `/api/v1`; the full contract with request and response 
 is in the OpenAPI docs at `/api/v1/docs`. Errors always look like
 `{"error": {"code": "...", "message": "..."}}`.
 
-| Method and path                              | Auth         | What it does                                                  |
-| -------------------------------------------- | ------------ | ------------------------------------------------------------- |
-| `GET /health`                                | —            | Liveness: API and database                                    |
-| `POST /auth/register`                        | —            | Create an account and sign in                                 |
-| `POST /auth/login`                           | —            | Sign in with email and password                               |
-| `POST /auth/logout`                          | optional     | End the current session                                       |
-| `GET /auth/me`                               | required     | Own account: email, profile, interests                        |
-| `PATCH /me/profile`                          | required     | Edit display name, bio, website                               |
-| `PUT /me/interests`                          | required     | Replace topic interests, e.g. `{"tags": ["ethics"]}`          |
-| `GET /authors/{handle}`                      | —            | Public author profile                                         |
-| `GET /articles`                              | —            | Published articles: `q`, `tag`, `author`, `page`, `page_size` |
-| `GET /articles/{slug}`                       | —            | One article (drafts only for their author)                    |
-| `POST /articles`                             | required     | Create a draft                                                |
-| `PATCH /articles/{id}`                       | owner        | Edit title, summary, Markdown body, tags                      |
-| `POST /articles/{id}/publish`                | owner        | Publish (slug is frozen from now on)                          |
-| `POST /articles/{id}/unpublish`              | owner        | Take a published article down                                 |
-| `DELETE /articles/{id}`                      | owner        | Soft delete                                                   |
-| `GET /me/articles`                           | required     | Own articles in every status                                  |
-| `GET /me/articles/{id}`                      | owner        | One own article in any status (for the editor)                |
-| `GET /tags`                                  | —            | Tag catalog with published-article counts                     |
-| `POST`/`DELETE /authors/{id}/follow`         | required     | Follow / unfollow an author (idempotent)                      |
-| `GET /me/following`, `GET /feed/following`   | required     | Followed authors; their new essays                            |
-| `POST`/`DELETE /articles/{id}/bookmark`      | required     | Save / unsave a published essay                               |
-| `GET /me/bookmarks`                          | required     | Saved essays that are still public                            |
-| `GET`/`POST /articles/{id}/comments`         | — / required | Read / write plain-text comments                              |
-| `PATCH`/`DELETE /comments/{id}`              | owner        | Edit / delete your comment                                    |
-| `POST /reports`                              | required     | Report an article or comment                                  |
-| `GET /admin/reports`, `POST /admin/moderate` | admin        | Review reports; hide or unhide content                        |
+| Method and path                                            | Auth         | What it does                                                  |
+| ---------------------------------------------------------- | ------------ | ------------------------------------------------------------- |
+| `GET /health`                                              | —            | Liveness: API and database                                    |
+| `POST /auth/register`                                      | —            | Create an account and sign in                                 |
+| `POST /auth/login`                                         | —            | Sign in with email and password                               |
+| `POST /auth/logout`                                        | optional     | End the current session                                       |
+| `GET /auth/me`                                             | required     | Own account: email, profile, interests                        |
+| `PATCH /me/profile`                                        | required     | Edit display name, bio, website                               |
+| `PUT /me/interests`                                        | required     | Replace topic interests, e.g. `{"tags": ["ethics"]}`          |
+| `GET /authors/{handle}`                                    | —            | Public author profile                                         |
+| `GET /articles`                                            | —            | Published articles: `q`, `tag`, `author`, `page`, `page_size` |
+| `GET /articles/{slug}`                                     | —            | One article (drafts only for their author)                    |
+| `POST /articles`                                           | required     | Create a draft                                                |
+| `PATCH /articles/{id}`                                     | owner        | Edit title, summary, Markdown body, tags                      |
+| `POST /articles/{id}/publish`                              | owner        | Publish (slug is frozen from now on)                          |
+| `POST /articles/{id}/unpublish`                            | owner        | Take a published article down                                 |
+| `DELETE /articles/{id}`                                    | owner        | Soft delete                                                   |
+| `GET /me/articles`                                         | required     | Own articles in every status                                  |
+| `GET /me/articles/{id}`                                    | owner        | One own article in any status (for the editor)                |
+| `GET /tags`                                                | —            | Tag catalog with published-article counts                     |
+| `POST`/`DELETE /authors/{id}/follow`                       | required     | Follow / unfollow an author (idempotent)                      |
+| `GET /me/following`, `GET /feed/following`                 | required     | Followed authors; their new essays                            |
+| `POST`/`DELETE /articles/{id}/bookmark`                    | required     | Save / unsave a published essay                               |
+| `GET /me/bookmarks`                                        | required     | Saved essays that are still public                            |
+| `GET`/`POST /articles/{id}/comments`                       | — / required | Read / write plain-text comments                              |
+| `PATCH`/`DELETE /comments/{id}`                            | owner        | Edit / delete your comment                                    |
+| `POST /reports`                                            | required     | Report an article or comment                                  |
+| `GET /admin/reports`, `POST /admin/moderate`               | admin        | Review reports; hide or unhide content                        |
+| `POST /authors/{id}/newsletter-subscriptions`              | —            | Subscribe by email (double opt-in), always `202`              |
+| `POST /newsletter/confirm`, `POST /newsletter/unsubscribe` | token        | Confirm / stop a subscription                                 |
 
 Signing in sets an `HttpOnly`, `SameSite=Lax` session cookie (`Secure` when
 `APP_ENV=production`). `POST`, `PATCH`, `PUT` and `DELETE` requests sent by a browser must
@@ -121,6 +128,42 @@ curl -c jar.txt -H 'Content-Type: application/json' \
   http://localhost:8000/api/v1/auth/register
 curl -b jar.txt http://localhost:8000/api/v1/auth/me
 ```
+
+## Email subscriptions
+
+Anyone can subscribe to an author's new essays from the author's page, without an account.
+
+1. `POST /authors/{id}/newsletter-subscriptions` stores a **pending** subscription and emails
+   a confirmation link (double opt-in). The answer is always the same `202`, so the endpoint
+   cannot be used to find out who is subscribed. A new link is sent at most every 10 minutes.
+2. The link opens `/newsletter/confirm#token=…`; pressing the button confirms
+   (`POST /newsletter/confirm`). Tokens are random, single-purpose, expire after 48 hours and
+   are stored only as SHA-256 hashes. They sit after `#`, which browsers never send to a
+   server, so they cannot appear in access logs.
+3. The **first** publication of an essay creates one row in `email_jobs` per confirmed
+   subscriber, in the same transaction. Edits, unpublish/republish and repeated publish
+   calls create nothing (`UNIQUE(article_id, subscription_id)`).
+4. The `worker` service sends due jobs over SMTP, one at a time with a short pause (rate
+   limit). Temporary errors (server down, 4xx) are retried after 1, 5, 25, 125 minutes;
+   after 5 attempts, or on a permanent 5xx rejection, the job is marked `failed` with an
+   `error_code`. Jobs for people who unsubscribed, or for essays no longer public, are
+   `cancelled` instead of sent.
+5. Every email has an unsubscribe link (and a `List-Unsubscribe` header) that works without
+   signing in (`POST /newsletter/unsubscribe`).
+
+**Delivery guarantee (and its limit).** A job is marked `sent` only after the SMTP server
+accepted the message. If the worker crashes in between, the job is still `pending` and the
+email is sent once more after restart. Exactly-once delivery cannot be guaranteed with
+SMTP; Aporia guarantees _at least once_, with a duplicate possible only in that crash
+window, and _never more than one job per essay and subscriber_.
+
+**Production SMTP.** Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_STARTTLS=true`, `MAIL_FROM`, `PUBLIC_BASE_URL` (your site's URL, used in links) and a
+random `SECRET_KEY` (32+ characters; it signs unsubscribe links, so keep it stable). Do not
+run `mailpit` in production. No paid email service is required or configured.
+
+Finished jobs are deleted after `EMAIL_JOB_RETENTION_DAYS` (90) and never-confirmed
+subscriptions a week after their link expired.
 
 ## Moderation
 
@@ -162,39 +205,46 @@ npm run build
 What is checked automatically on every push and pull request
 ([.github/workflows/ci.yml](.github/workflows/ci.yml)) and what has only been checked by hand.
 
-| Check                                                                                        | How       |
-| -------------------------------------------------------------------------------------------- | --------- |
-| Backend lint and formatting (ruff)                                                           | Automatic |
-| Backend tests against PostgreSQL 16: health, error format, migrations                        | Automatic |
-| Auth: Argon2id hashes, sessions, logout, expired/tampered/replayed cookies                   | Automatic |
-| Auth: same answer for unknown email and wrong password                                       | Automatic |
-| CSRF: untrusted Origin/Referer rejected, trusted and non-browser allowed                     | Automatic |
-| Profiles: input limits, own profile only, public view hides email                            | Automatic |
-| Articles: drafts private, publish/unpublish/delete, only owner can change                    | Automatic |
-| Articles: slug stays the same after first publish, empty body cannot publish                 | Automatic |
-| Catalog: search (case, Unicode, wildcards), filters, pagination, 422s                        | Automatic |
-| Catalog: drafts/unpublished/deleted never listed; no N+1 queries                             | Automatic |
-| Frontend: pages render API data, loading/empty/error states, retry                           | Automatic |
-| Frontend: Markdown drops HTML, strips javascript: links, no remote images                    | Automatic |
-| Frontend: forms keep input on server errors; delete needs confirmation                       | Automatic |
-| Frontend: sign-in redirects only to same-site paths                                          | Automatic |
-| Social: follow/bookmark idempotent and unique, no self-follow, feed order                    | Automatic |
-| Comments: length limits, own edit/delete only, hidden with their article                     | Automatic |
-| Moderation: users get 403 on admin endpoints; hidden content gone everywhere                 | Automatic |
-| UI: save/follow toggles, comments edit/delete/report, sort, following feed                   | Automatic |
-| No passwords, session tokens or emails in application logs                                   | Automatic |
-| Migrations apply to an empty database, downgrade and re-apply                                | Automatic |
-| ORM models match migrations (`alembic check`)                                                | Automatic |
-| Frontend lint, formatting, typecheck, unit tests, production build                           | Automatic |
-| `docker compose up` from scratch: images build, API and web healthy                          | Automatic |
-| Page layout at 360 px and 1280 px, no horizontal scroll                                      | Manual    |
-| API returns 503 and the page shows it when the database is stopped                           | Manual    |
-| Data survives `docker compose down` / `up`                                                   | Manual    |
-| Full auth flow in Chromium through nginx; cookie unreadable from JS                          | Manual    |
-| Cross-site form POST from another origin is blocked in Chromium                              | Manual    |
-| Full UI flow in Chromium at 360 px: sign up → write → publish → unpublish → delete           | Manual    |
-| Keyboard: skip link first, visible focus; no horizontal scroll at 360 px                     | Manual    |
-| Two readers and an admin in Chromium: save, follow, comment, report, hide via CLI-made admin | Manual    |
+| Check                                                                                         | How       |
+| --------------------------------------------------------------------------------------------- | --------- |
+| Backend lint and formatting (ruff)                                                            | Automatic |
+| Backend tests against PostgreSQL 16: health, error format, migrations                         | Automatic |
+| Auth: Argon2id hashes, sessions, logout, expired/tampered/replayed cookies                    | Automatic |
+| Auth: same answer for unknown email and wrong password                                        | Automatic |
+| CSRF: untrusted Origin/Referer rejected, trusted and non-browser allowed                      | Automatic |
+| Profiles: input limits, own profile only, public view hides email                             | Automatic |
+| Articles: drafts private, publish/unpublish/delete, only owner can change                     | Automatic |
+| Articles: slug stays the same after first publish, empty body cannot publish                  | Automatic |
+| Catalog: search (case, Unicode, wildcards), filters, pagination, 422s                         | Automatic |
+| Catalog: drafts/unpublished/deleted never listed; no N+1 queries                              | Automatic |
+| Frontend: pages render API data, loading/empty/error states, retry                            | Automatic |
+| Frontend: Markdown drops HTML, strips javascript: links, no remote images                     | Automatic |
+| Frontend: forms keep input on server errors; delete needs confirmation                        | Automatic |
+| Frontend: sign-in redirects only to same-site paths                                           | Automatic |
+| Social: follow/bookmark idempotent and unique, no self-follow, feed order                     | Automatic |
+| Comments: length limits, own edit/delete only, hidden with their article                      | Automatic |
+| Moderation: users get 403 on admin endpoints; hidden content gone everywhere                  | Automatic |
+| UI: save/follow toggles, comments edit/delete/report, sort, following feed                    | Automatic |
+| Email: double opt-in, same answer for every address, resend cooldown, tokens hashed           | Automatic |
+| Email: expired/invalid tokens rejected, confirm and unsubscribe idempotent                    | Automatic |
+| Email: one job per essay and subscriber; edits and republishing send nothing                  | Automatic |
+| Worker: send, retry with backoff, give up, permanent failure, cancel, cleanup                 | Automatic |
+| Worker: publishing works with SMTP down; logs hold no addresses or tokens                     | Automatic |
+| Docker Compose: worker and Mailpit running                                                    | Automatic |
+| No passwords, session tokens or emails in application logs                                    | Automatic |
+| Migrations apply to an empty database, downgrade and re-apply                                 | Automatic |
+| ORM models match migrations (`alembic check`)                                                 | Automatic |
+| Frontend lint, formatting, typecheck, unit tests, production build                            | Automatic |
+| `docker compose up` from scratch: images build, API and web healthy                           | Automatic |
+| Page layout at 360 px and 1280 px, no horizontal scroll                                       | Manual    |
+| API returns 503 and the page shows it when the database is stopped                            | Manual    |
+| Data survives `docker compose down` / `up`                                                    | Manual    |
+| Full auth flow in Chromium through nginx; cookie unreadable from JS                           | Manual    |
+| Cross-site form POST from another origin is blocked in Chromium                               | Manual    |
+| Full UI flow in Chromium at 360 px: sign up → write → publish → unpublish → delete            | Manual    |
+| Keyboard: skip link first, visible focus; no horizontal scroll at 360 px                      | Manual    |
+| Two readers and an admin in Chromium: save, follow, comment, report, hide via CLI-made admin  | Manual    |
+| Real emails via Mailpit: subscribe → confirm → new essay → unsubscribe; SMTP outage and retry | Manual    |
 
 ## Project structure
 

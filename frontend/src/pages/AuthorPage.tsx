@@ -7,6 +7,7 @@ import { useAuth } from '../auth/context'
 import { ArticleCard } from '../components/ArticleCard'
 import { Avatar } from '../components/Avatar'
 import { Pagination } from '../components/Pagination'
+import { NewsletterForm } from '../components/NewsletterForm'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { FollowButton } from '../components/ToggleButtons'
 import { useAsync } from '../hooks/useAsync'
@@ -81,6 +82,12 @@ export function AuthorPage() {
           )}
         </div>
       </header>
+
+      {user?.id !== profile.id && (
+        <div className="mt-8">
+          <NewsletterForm authorId={profile.id} authorName={profile.display_name} />
+        </div>
+      )}
 
       <section aria-labelledby="essays-heading" className="mt-10">
         <h2
