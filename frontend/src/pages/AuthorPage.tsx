@@ -8,6 +8,7 @@ import { ArticleCard } from '../components/ArticleCard'
 import { Avatar } from '../components/Avatar'
 import { Pagination } from '../components/Pagination'
 import { Empty, ErrorState, Loading } from '../components/States'
+import { FollowButton } from '../components/ToggleButtons'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { formatDate } from '../lib/format'
@@ -18,11 +19,13 @@ const PAGE_SIZE = 10
 /** FE-03: an author's public profile and published essays. */
 export function AuthorPage() {
   const { handle = '' } = useParams()
+  const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const page = Math.max(1, Number(params.get('page')) || 1)
-  const { user } = useAuth()
 
-  const author = useAsync(`author:${handle}`, (signal) => getAuthor(handle, signal))
+  const author = useAsync(`author:${handle}:${user?.id ?? 'guest'}`, (signal) =>
+    getAuthor(handle, signal),
+  )
   const articles = useAsync(`author-articles:${handle}:${page}`, (signal) =>
     listArticles({ author: handle, page, pageSize: PAGE_SIZE }, signal),
   )
@@ -61,12 +64,20 @@ export function AuthorPage() {
               </a>
             </p>
           )}
-          {user?.id === profile.id && (
+          {user?.id === profile.id ? (
             <p className="mt-3">
               <Link to="/account" className="font-medium text-accent-strong underline">
                 Edit your profile
               </Link>
             </p>
+          ) : (
+            <div className="mt-4">
+              <FollowButton
+                authorId={profile.id}
+                authorName={profile.display_name}
+                initial={profile.followed_by_me}
+              />
+            </div>
           )}
         </div>
       </header>

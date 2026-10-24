@@ -27,6 +27,9 @@ export function Layout({ children }: { children: ReactNode }) {
             </NavLink>
             {user ? (
               <>
+                <NavLink to="/following" className={navLink}>
+                  Following
+                </NavLink>
                 <NavLink to="/write" className={navLink}>
                   Write
                 </NavLink>

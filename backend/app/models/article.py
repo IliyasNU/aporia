@@ -28,6 +28,7 @@ class Article(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "articles"
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'published', 'unpublished')", name="status"),
+        CheckConstraint("moderation_status IN ('visible', 'hidden')", name="moderation_status"),
         Index("ix_articles_status_published_at", "status", "published_at"),
     )
 
@@ -46,6 +47,8 @@ class Article(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Soft delete: the row stays for integrity, but nobody sees the article.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # "hidden" when an admin took it down (MOD-01); see ModerationStatus.
+    moderation_status: Mapped[str] = mapped_column(String(16), server_default="visible")
 
     author: Mapped[User] = relationship()
     tags: Mapped[list[Tag]] = relationship(secondary=article_tags, order_by=Tag.slug)

@@ -1,10 +1,13 @@
 import { api } from './client'
-import type { Article, ArticleListItem, Page } from './types'
+import type { Article, ArticleDetail, ArticleListItem, Page } from './types'
+
+export type ArticleSort = 'latest' | 'popular'
 
 export type ArticleQuery = {
   q?: string
   tag?: string
   author?: string
+  sort?: ArticleSort
   page?: number
   pageSize?: number
 }
@@ -16,7 +19,7 @@ export type ArticleDraft = {
   tags: string[]
 }
 
-function queryString(params: Record<string, string | number | undefined>): string {
+export function queryString(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== '') search.set(key, String(value))
@@ -31,6 +34,7 @@ export const listArticles = (query: ArticleQuery, signal?: AbortSignal) =>
       q: query.q,
       tag: query.tag,
       author: query.author,
+      sort: query.sort === 'popular' ? 'popular' : undefined,
       page: query.page,
       page_size: query.pageSize,
     })}`,
@@ -38,7 +42,7 @@ export const listArticles = (query: ArticleQuery, signal?: AbortSignal) =>
   )
 
 export const getArticle = (slug: string, signal?: AbortSignal) =>
-  api<Article>(`/articles/${encodeURIComponent(slug)}`, { signal })
+  api<ArticleDetail>(`/articles/${encodeURIComponent(slug)}`, { signal })
 
 export const createArticle = (draft: ArticleDraft) =>
   api<Article>('/articles', { method: 'POST', body: draft })
