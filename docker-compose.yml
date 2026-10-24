@@ -63,7 +63,12 @@ services:
     command: ["python", "-m", "app.worker"]
     environment: *backend-env
     healthcheck:
-      disable: true # no HTTP server to probe; `docker compose ps` shows whether it runs
+      # Healthy while the worker loop keeps touching its heartbeat file.
+      test: ["CMD", "python", "-m", "app.worker.healthcheck"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     depends_on:
       migrate:
         condition: service_completed_successfully

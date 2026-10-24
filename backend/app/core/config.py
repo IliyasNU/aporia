@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     worker_max_attempts: int = Field(default=5, ge=1, le=20)
     worker_send_delay_seconds: float = Field(default=0.2, ge=0)  # simple rate limit
     email_job_retention_days: int = Field(default=90, ge=1)
+    # Touched after every worker loop; the container healthcheck reads its age.
+    worker_heartbeat_file: str = "/tmp/aporia-worker-heartbeat"  # noqa: S108
+    worker_heartbeat_max_age_seconds: int = Field(default=300, ge=10)
 
     @field_validator("trusted_origins", mode="before")
     @classmethod
