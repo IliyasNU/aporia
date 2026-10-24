@@ -1,38 +1,66 @@
-import { ApiStatus } from './components/ApiStatus'
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router'
+
+import { AuthProvider } from './auth/AuthProvider'
+import { Layout } from './components/Layout'
+import { RequireAuth } from './components/RequireAuth'
+import { AccountPage } from './pages/AccountPage'
+import { ArticlePage } from './pages/ArticlePage'
+import { AuthorPage } from './pages/AuthorPage'
+import { EditorPage } from './pages/EditorPage'
+import { HomePage } from './pages/HomePage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { SignInPage } from './pages/SignInPage'
+import { SignUpPage } from './pages/SignUpPage'
+
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    // Braces matter: newer browsers return a Promise from scrollTo, and an
+    // effect must return nothing or a cleanup function.
+    window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
 
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-rule">
-        <div className="mx-auto max-w-3xl px-4 py-5">
-          <span className="font-serif text-2xl font-semibold tracking-tight">Aporia</span>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12">
-        <h1 className="font-serif text-3xl leading-tight font-semibold sm:text-4xl">
-          A home for philosophical essays
-        </h1>
-        <p className="mt-4 max-w-prose text-lg leading-relaxed text-muted">
-          Aporia is under construction. Reading, publishing, author subscriptions and transparent
-          recommendations will arrive in the upcoming releases.
-        </p>
-
-        <section aria-labelledby="status-heading" className="mt-10 border-t border-rule pt-6">
-          <h2 id="status-heading" className="text-sm font-semibold tracking-wide uppercase">
-            System status
-          </h2>
-          <div className="mt-3">
-            <ApiStatus />
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-rule">
-        <div className="mx-auto max-w-3xl px-4 py-5 text-sm text-muted">
-          Aporia · v0.1 development build
-        </div>
-      </footer>
-    </div>
+    <AuthProvider>
+      <ScrollToTop />
+      <Layout>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/articles/:slug" element={<ArticlePage />} />
+          <Route path="/authors/:handle" element={<AuthorPage />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route
+            path="/write"
+            element={
+              <RequireAuth>
+                <EditorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/write/:id"
+            element={
+              <RequireAuth>
+                <EditorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <RequireAuth>
+                <AccountPage />
+              </RequireAuth>
+            }
+          />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Layout>
+    </AuthProvider>
   )
 }
