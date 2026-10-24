@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.router import API_PREFIX, api_router
 from app.core.config import get_settings
+from app.core.csrf import csrf_middleware
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     register_error_handlers(app)
+    app.middleware("http")(csrf_middleware)
     app.include_router(api_router)
     return app
 
