@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { guest, makeArticle, makeMe, mockApi, renderApp } from '../test/api'
@@ -21,7 +21,8 @@ describe('ArticlePage', () => {
     expect(screen.getByText('1 Mar 2026')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Epistemology' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull()
-    expect(document.title).toBe('On Doubt · Aporia')
+    // The title is set in an effect, which may run just after the heading appears.
+    await waitFor(() => expect(document.title).toBe('On Doubt · Aporia'))
   })
 
   it('shows "not found" for missing, unpublished or other people\'s draft essays', async () => {
