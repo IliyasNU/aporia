@@ -10,6 +10,7 @@ import { AuthorPage } from './pages/AuthorPage'
 import { EditorPage } from './pages/EditorPage'
 import { FollowingPage } from './pages/FollowingPage'
 import { HomePage } from './pages/HomePage'
+import { ConfirmSubscriptionPage, UnsubscribePage } from './pages/NewsletterPages'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
@@ -35,6 +36,8 @@ export default function App() {
           <Route path="/authors/:handle" element={<AuthorPage />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/newsletter/confirm" element={<ConfirmSubscriptionPage />} />
+          <Route path="/newsletter/unsubscribe" element={<UnsubscribePage />} />
           <Route
             path="/write"
             element={
