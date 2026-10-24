@@ -11,7 +11,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | **In review** |
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | **In review** |
 | 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | **In review** |
-| 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | Not started   |
+| 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | **In review** |
 | 7     | Release: security hardening, Docker smoke, docs, demo         | SEC-01 … SEC-07           | Not started   |
 
 ## Stage 0: what exists
@@ -92,3 +92,11 @@ Screens (React Router, all wired to the real API):
   Docker Compose.
 - UI: subscribe form on author pages, `/newsletter/confirm` and `/newsletter/unsubscribe`
   pages that act only on a button press.
+
+## Stage 6: what exists
+
+- `app/services/ranking.py`: pure scoring with the spec's weights, log-scaled popularity,
+  30-day freshness decay, a greedy diversity bonus, a stable tie-breaker and reasons.
+- `app/services/recommendations.py`: loads candidates and signals in 4 queries.
+- `GET /feed/recommended` for guests and signed-in readers (`cold_start` flag), paginated.
+- UI: "For you" page with a reason on every card and hints for cold start.

@@ -58,3 +58,7 @@ export type Page<T> = {
   page_size: number
   total: number
 }
+
+export type Recommendation = { article: ArticleListItem; reason: string; score: number }
+
+export type RecommendationPage = Page<Recommendation> & { cold_start: boolean }
