@@ -7,7 +7,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | ----- | ------------------------------------------------------------- | ------------------------- | ------------- |
 | 0     | Foundation: repo layout, settings, Compose, migrations, CI    | —                         | **In review** |
 | 1     | Accounts: register/login/logout, sessions, profile, interests | AUTH-01, AUTH-02, USER-01 | **In review** |
-| 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | Not started   |
+| 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | **In review** |
 | 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | Not started   |
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | Not started   |
 | 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | Not started   |
@@ -33,5 +33,18 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
   `PATCH /me/profile`, `PUT /me/interests`, `GET /authors/{handle}`.
 - Argon2id password hashing, hashed server-side session tokens, `HttpOnly`/`SameSite=Lax`
   cookies (`Secure` in production), Origin/Referer CSRF check on state-changing requests.
-- Not yet: rate limiting (Stage 7), the web UI for these features (Stage 3), the author's
-  article list on the public profile (Stage 2), admin assignment (Stage 4).
+- Not yet: rate limiting (Stage 7), the web UI for these features (Stage 3), admin
+  assignment (Stage 4).
+
+## Stage 2: what exists
+
+- Migration `0003`: `articles` (status `draft` / `published` / `unpublished`,
+  `published_at` = first publication, `deleted_at` for soft delete) and `article_tags`.
+- `GET /articles` (search in title and summary, filter by `tag` and `author`, pagination),
+  `GET /articles/{slug}`, `POST /articles`, `PATCH /articles/{id}`,
+  `POST /articles/{id}/publish`, `POST /articles/{id}/unpublish`, `DELETE /articles/{id}`.
+- Additions needed by the frontend: `GET /me/articles`, `GET /me/articles/{id}` (editor)
+  and `GET /tags` (catalog with counts, for popular tags and pickers).
+- One visibility rule (`app/services/visibility.py`) used by every public query.
+- Not yet: `sort=popular` needs bookmarks and arrives with Stage 4; until then `sort`
+  accepts only `latest`.
