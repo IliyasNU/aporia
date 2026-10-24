@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import MetaData, text
+from sqlalchemy import DateTime, MetaData, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Deterministic constraint names, so Alembic migrations can refer to them.
@@ -29,4 +30,15 @@ class UUIDPrimaryKeyMixin:
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
         sort_order=-1,  # keep "id" as the first column in generated migrations
+    )
+
+
+class TimestampMixin:
+    """created_at / updated_at, stored as timestamptz (UTC)."""
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), sort_order=100
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), sort_order=101
     )
