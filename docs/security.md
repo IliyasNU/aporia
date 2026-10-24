@@ -41,7 +41,16 @@ in the `Server` header.
 ## Known limits
 
 - Rate-limit counters live in the API process's memory (one process in this setup).
-- The API port must stay private: it trusts `X-Forwarded-For` from any address
-  (`FORWARDED_ALLOW_IPS="*"`) because only nginx can reach it in Docker Compose.
+- The API trusts `X-Forwarded-For` from any address (`FORWARDED_ALLOW_IPS="*"`); that is
+  safe only because Docker Compose does not publish its port. Never add one.
+- Swagger UI (`/api/v1/docs`) loads a pinned version from a CDN; set
+  `API_DOCS_ENABLED=false` to switch it off.
+- Creating an essay reveals whether its slug is already taken (even by a draft): the
+  title's slug is visible, never the content.
+- Ten failed logins for one email within five minutes block further attempts for that
+  email, including its owner, until the window passes.
 - No account self-deletion in v1.0; the operator uses `python -m app.cli delete-user`.
 - No two-factor authentication or password reset (v1.1+ per the requirements).
+
+The independent pre-release audit and how each finding was resolved:
+[audit-v1.0.md](audit-v1.0.md).

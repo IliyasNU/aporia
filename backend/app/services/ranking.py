@@ -96,12 +96,20 @@ def explain(candidate: Candidate, components: dict[str, float], reader: Reader) 
     return "Recently published"
 
 
+def _total(components: dict[str, float]) -> float:
+    return round(sum(WEIGHTS[name] * value for name, value in components.items()), 9)
+
+
 def rank(candidates: list[Candidate], reader: Reader, now: datetime) -> list[Ranked]:
     """Score and order all candidates.
 
     Diversity depends on what is already above an essay, so the list is built
     greedily: at each step the candidate with the best total score (including
     its diversity against the essays chosen so far) goes next.
+
+    Speed-up with the same result: diversity adds at most WEIGHTS["diversity"],
+    so candidates are scanned from the highest base score down and the scan
+    stops as soon as nobody further down could still reach the best total.
     """
     most_bookmarks = max((c.bookmarks for c in candidates), default=0)
     base: dict[uuid.UUID, dict[str, float]] = {
@@ -113,21 +121,31 @@ def rank(candidates: list[Candidate], reader: Reader, now: datetime) -> list[Ran
         }
         for c in candidates
     }
+    base_total = {c.id: _total(base[c.id]) for c in candidates}
+    max_bonus = WEIGHTS["diversity"]
 
-    def total(components: dict[str, float]) -> float:
-        return round(sum(WEIGHTS[name] * value for name, value in components.items()), 9)
-
-    remaining = list(candidates)
+    remaining = sorted(
+        candidates, key=lambda c: (base_total[c.id], c.published_at, c.id), reverse=True
+    )
     shown_tags: set[str] = set()
     ranked: list[Ranked] = []
     while remaining:
-        scored = [(c, {**base[c.id], "diversity": diversity(c, shown_tags)}) for c in remaining]
-        best, components = max(
-            scored, key=lambda item: (total(item[1]), item[0].published_at, item[0].id)
-        )
+        # Start with the highest base score, then see whether anyone below beats it.
+        first = remaining[0]
+        best_index = 0
+        best_components = {**base[first.id], "diversity": diversity(first, shown_tags)}
+        best_key = (_total(best_components), first.published_at, first.id)
+        for index in range(1, len(remaining)):
+            candidate = remaining[index]
+            if base_total[candidate.id] + max_bonus < best_key[0] - 1e-9:
+                break  # sorted by base score: nobody below can catch up
+            components = {**base[candidate.id], "diversity": diversity(candidate, shown_tags)}
+            key = (_total(components), candidate.published_at, candidate.id)
+            if key > best_key:
+                best_key, best_index, best_components = key, index, components
+        best = remaining.pop(best_index)
         ranked.append(
-            Ranked(best, total(components), components, explain(best, components, reader))
+            Ranked(best, best_key[0], best_components, explain(best, best_components, reader))
         )
         shown_tags |= best.tags.keys()
-        remaining.remove(best)
     return ranked

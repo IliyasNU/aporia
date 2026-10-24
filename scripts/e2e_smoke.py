@@ -118,7 +118,7 @@ def main() -> None:
         {"email": fan},  # type: ignore[index]
     )
     check(status == 202, "guest subscribes by email")
-    confirm = token(wait_for_mail(fan, "Confirm your subscription"), "confirm")
+    confirm = token(wait_for_mail(fan, "Confirm your Aporia subscription"), "confirm")
     status, confirmed = Browser().call("POST", "/newsletter/confirm", {"token": confirm})
     check(status == 200, "subscription confirmed with the emailed link", confirmed)
 

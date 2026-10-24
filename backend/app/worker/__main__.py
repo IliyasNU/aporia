@@ -40,12 +40,13 @@ def main() -> None:
                 if time.monotonic() - last_cleanup > CLEANUP_EVERY_SECONDS:
                     clean_up(db)
                     last_cleanup = time.monotonic()
+            # Only a pass that reached the database counts as healthy
+            # (python -m app.worker.healthcheck reads this file's age).
+            Path(settings.worker_heartbeat_file).touch()
         except Exception:
             # e.g. the database restarting: log, wait, try again.
             logger.exception("Email worker iteration failed")
             sent = 0
-        # Tell the healthcheck (python -m app.worker.healthcheck) that the loop is alive.
-        Path(settings.worker_heartbeat_file).touch()
         if args.once:
             break
         if sent == 0:

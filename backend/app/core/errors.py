@@ -5,11 +5,13 @@ never stack traces or other internal details.
 """
 
 import logging
+import traceback
 from http import HTTPStatus
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas.errors import ErrorBody, ErrorResponse, ValidationIssue
@@ -91,7 +93,22 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
 
 
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    if isinstance(exc, DBAPIError):
+        # PostgreSQL error texts can quote the offending value (an email, a
+        # token...), so log the error class, SQLSTATE and where it happened,
+        # never the message itself (SEC-05).
+        diag = getattr(exc.orig, "diag", None)
+        logger.error(
+            "Database error %s (sqlstate %s, constraint %s) on %s %s\n%s",
+            type(exc.orig).__name__,
+            getattr(diag, "sqlstate", None),
+            getattr(diag, "constraint_name", None),
+            request.method,
+            request.url.path,
+            "".join(traceback.format_tb(exc.__traceback__)),
+        )
+    else:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return error_response(500, "Internal server error")
 
 

@@ -6,6 +6,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.schemas.base import RequestModel
 from app.schemas.users import TagOut
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -15,7 +16,7 @@ Body = Annotated[str, Field(max_length=100_000)]
 TagSlugs = Annotated[list[Annotated[str, Field(max_length=64)]], Field(max_length=5)]
 
 
-class ArticleCreate(BaseModel):
+class ArticleCreate(RequestModel):
     model_config = ConfigDict(extra="forbid")
 
     title: Title
@@ -24,7 +25,7 @@ class ArticleCreate(BaseModel):
     tags: TagSlugs = []
 
 
-class ArticleUpdate(BaseModel):
+class ArticleUpdate(RequestModel):
     """PATCH semantics: omitted fields stay unchanged. Status changes use publish/unpublish."""
 
     model_config = ConfigDict(extra="forbid")

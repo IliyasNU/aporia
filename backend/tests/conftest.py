@@ -13,7 +13,7 @@ TEST_DATABASE_URL = os.environ.get(
 # Must happen before any "app" import: settings and the engine read it at import time.
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["APP_ENV"] = "test"
-# Rate limits would trip over the many requests tests make; test_rate_limits.py turns them on.
+# Rate limits would trip over the many requests tests make; test_security.py turns them on.
 os.environ["RATE_LIMITS_ENABLED"] = "false"
 
 from collections.abc import Callable, Iterator

@@ -78,8 +78,8 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
 - **No account enumeration on login:** unknown email and wrong password return the same
   `401 invalid_credentials`, and an unknown email still runs one Argon2 verification so the
   response time is similar. Registration does answer `409 email_taken`; avoiding that
-  would need email verification, which is not part of v1.0. Rate limiting of login and
-  registration (SEC-03) is planned for Stage 7.
+  would need email verification, which is not part of v1.0. Login and registration are rate
+  limited (see "Release hardening").
 - **Roles:** `user` (every account can read and write) and `admin` (moderation, Stage 4).
   The API never lets users change their own role, email or handle.
 - **Privacy:** the public author profile shows handle, display name, bio and website, never
@@ -180,8 +180,10 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   use hand-calculated examples. `recommendations.py` does the I/O: one query for
   candidates (with authors and tags), one for bookmark counts, one each for the reader's
   interests and follows: always 4 queries, however many essays.
-- **Bounded work.** Only the newest 300 public essays are candidates; the greedy diversity
-  step is O(n²) over them, which stays well under 100 ms.
+- **Bounded work.** Only the newest 300 public essays are candidates. The greedy diversity
+  step scans candidates by base score and stops once nobody below can catch up (diversity
+  adds at most 0.05), which gives the same order as the plain O(n²) definition in about
+  35 ms for 300 candidates.
 - **Limiting hits.** Popularity uses `log1p`, so an essay with 10 bookmarks keeps about a
   third of the signal of one with 1000.
 - **Explanations.** The reason is the component with the largest weighted contribution;
@@ -194,7 +196,12 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   email or user id, with `429` and `Retry-After`. One API process makes this exact; with
   several processes each would count separately (documented).
 - **Client IP:** nginx overwrites `X-Forwarded-For` with the address it sees, and uvicorn
-  (`--proxy-headers`, `FORWARDED_ALLOW_IPS`) trusts it because only nginx reaches the API.
+  (`--proxy-headers`, `FORWARDED_ALLOW_IPS`) trusts it. That is safe because Docker
+  Compose does not publish the API port: only nginx can reach the API.
+- **Logs:** SQL parameters are never logged (`hide_parameters=True`), and database errors
+  are logged without their message text, which PostgreSQL may fill with input values.
+- **Input:** request bodies inherit `RequestModel`, which refuses NUL characters; a
+  middleware does the same for paths and query strings.
 - **Request size:** nginx `client_max_body_size 512k` and an API middleware returning 413.
 - **Headers:** CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Operations:** maintenance commands in `app/cli.py`; the worker also removes ended

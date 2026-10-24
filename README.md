@@ -40,7 +40,8 @@ docker compose up --build
 
 Compose starts `db` (PostgreSQL 16), `migrate` (applies migrations once, then exits),
 `api` (FastAPI), `worker` (sends queued emails), `web` (nginx serving the app and proxying
-`/api`) and `mailpit` (development SMTP inbox). All ports are bound to `127.0.0.1`.
+`/api`) and `mailpit` (development SMTP inbox). Published ports are bound to `127.0.0.1`;
+the API itself is only reachable through `web`.
 
 Want content to click through? `docker compose exec api python -m app.cli seed-demo`
 creates clearly labelled demo accounts and essays (sign in as
@@ -83,18 +84,20 @@ New to the code? Start with the [codebase guide](docs/codebase-guide.md).
 Settings come from environment variables (or `backend/.env`; for Docker, a root `.env`;
 see `.env.example`). Every value has a working local default.
 
-| Variable                 | Default / meaning                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------- |
-| `APP_ENV`                | `development`; `production` enables `Secure` cookies and stricter checks                           |
-| `DATABASE_URL`           | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia`                                         |
-| `SECRET_KEY`             | dev placeholder; **32+ random characters required in production**                                  |
-| `PUBLIC_BASE_URL`        | `http://localhost:8080`, used in email links                                                       |
-| `TRUSTED_ORIGINS`        | local origins; comma-separated browser origins allowed to change data                              |
-| `SMTP_HOST`, `SMTP_PORT` | `localhost`, `1025` (Mailpit); plus `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM` |
-| `SESSION_TTL_DAYS`       | `14`                                                                                               |
-| `RATE_LIMITS_ENABLED`    | `true`                                                                                             |
-| `LOG_LEVEL`              | `INFO`                                                                                             |
-| `TEST_DATABASE_URL`      | `…/aporia_test`, used by pytest and wiped on every run                                             |
+| Variable                         | Default / meaning                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `APP_ENV`                        | `development`; `production` enables `Secure` cookies and stricter checks                           |
+| `DATABASE_URL`                   | `postgresql+psycopg://aporia:aporia@localhost:5432/aporia`                                         |
+| `SECRET_KEY`                     | dev placeholder; **32+ random characters required in production**                                  |
+| `PUBLIC_BASE_URL`                | `http://localhost:8080`, used in email links                                                       |
+| `TRUSTED_ORIGINS`                | local origins; comma-separated browser origins allowed to change data                              |
+| `SMTP_HOST`, `SMTP_PORT`         | `localhost`, `1025` (Mailpit); plus `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM` |
+| `SESSION_TTL_DAYS`               | `14`                                                                                               |
+| `RATE_LIMITS_ENABLED`            | `true`                                                                                             |
+| `API_DOCS_ENABLED`               | `true`; Swagger UI page at `/api/v1/docs`                                                          |
+| `DELETED_CONTENT_RETENTION_DAYS` | `30`; deleted essays/comments and unsubscribed addresses are purged after this                     |
+| `LOG_LEVEL`                      | `INFO`                                                                                             |
+| `TEST_DATABASE_URL`              | `…/aporia_test`, used by pytest and wiped on every run                                             |
 
 Running it on a real server (HTTPS, SMTP, backups): [docs/deployment.md](docs/deployment.md).
 
@@ -151,6 +154,7 @@ docker compose exec api python -m app.cli delete-article <article-id>      # per
 docker compose exec api python -m app.cli delete-comment <comment-id>
 docker compose exec api python -m app.cli delete-user ada@example.com      # with all content
 docker compose exec api python -m app.cli delete-subscriber fan@example.com
+docker compose exec api python -m app.cli requeue-failed-emails            # after an SMTP fix
 ```
 
 `GET /admin/reports` lists open reports; `POST /admin/moderate` with
@@ -173,12 +177,13 @@ Backend tests need the `db` container (they create and wipe `aporia_test`).
 
 **Checked automatically on every push** (GitHub Actions):
 
-- Backend: lint, formatting, about 250 tests against PostgreSQL 16 (auth, sessions,
+- Backend: lint, formatting, nearly 300 tests against PostgreSQL 16 (auth, sessions,
   CSRF, profiles, articles, catalog, follows, bookmarks, comments, moderation, email
   subscriptions, worker, ranking, recommendations, rate limits, admin commands), migrations
   from an empty database and back, models matching migrations, no N+1 on lists, no
-  secrets in logs, every mutating endpoint requiring a session unless public by design.
-- Frontend: lint, formatting, type checking, about 60 component and page tests (states,
+  secrets in logs, every mutating endpoint requiring a session unless public by design,
+  and a regression test for every finding of the independent audit.
+- Frontend: lint, formatting, type checking, over 60 component and page tests (states,
   forms keeping input, safe Markdown, redirects, social controls, email pages,
   recommendations), production build.
 - Docker Compose from scratch: all images build, every service healthy, then
@@ -199,16 +204,17 @@ The scenario-by-scenario list is in [docs/release-checklist.md](docs/release-che
 
 ## Documentation
 
-| Document                                               | For                                              |
-| ------------------------------------------------------ | ------------------------------------------------ |
-| [docs/codebase-guide.md](docs/codebase-guide.md)       | Understanding and extending the code             |
-| [docs/architecture.md](docs/architecture.md)           | Technical decisions and why                      |
-| [docs/security.md](docs/security.md)                   | Security and privacy, requirement by requirement |
-| [docs/deployment.md](docs/deployment.md)               | Running it on a server                           |
-| [docs/demo.md](docs/demo.md)                           | A 5–7 minute demo                                |
-| [docs/release-checklist.md](docs/release-checklist.md) | Evidence for every end-to-end scenario           |
-| [docs/roadmap.md](docs/roadmap.md)                     | Stages and requirement IDs                       |
-| [CHANGELOG.md](CHANGELOG.md)                           | What v1.0 contains and its known limitations     |
+| Document                                               | For                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| [docs/codebase-guide.md](docs/codebase-guide.md)       | Understanding and extending the code                    |
+| [docs/architecture.md](docs/architecture.md)           | Technical decisions and why                             |
+| [docs/security.md](docs/security.md)                   | Security and privacy, requirement by requirement        |
+| [docs/audit-v1.0.md](docs/audit-v1.0.md)               | The independent audit and how each finding was resolved |
+| [docs/deployment.md](docs/deployment.md)               | Running it on a server                                  |
+| [docs/demo.md](docs/demo.md)                           | A 5–7 minute demo                                       |
+| [docs/release-checklist.md](docs/release-checklist.md) | Evidence for every end-to-end scenario                  |
+| [docs/roadmap.md](docs/roadmap.md)                     | Stages and requirement IDs                              |
+| [CHANGELOG.md](CHANGELOG.md)                           | What v1.0 contains and its known limitations            |
 
 ## Project structure
 

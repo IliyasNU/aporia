@@ -27,6 +27,11 @@ Argon2id, hashed session and email tokens, `HttpOnly`/`SameSite=Lax`/`Secure` co
 Origin/Referer CSRF check, rate limits, request size limits, safe Markdown rendering,
 Content-Security-Policy and other headers, no secrets in logs. See `docs/security.md`.
 
+### Independent audit
+
+An independent pre-release audit found 4 medium and 11 low issues plus notes; all were
+fixed or consciously accepted before release. See `docs/audit-v1.0.md`.
+
 ### Known limitations
 
 - Rate limits are kept in memory per API process (fine for the single-process setup).
@@ -39,4 +44,7 @@ Content-Security-Policy and other headers, no secrets in logs. See `docs/securit
 - No self-service account deletion, password reset, OAuth, image uploads, comment replies,
   notifications or admin panel; these are v1.1+ per the requirements.
 - No server-side rendering or sitemap (optional in the spec).
+- Creating an essay reveals whether its title's slug is already taken (also by drafts).
+- Ten failed logins for one email in five minutes block that email for up to five
+  minutes, including its owner.
 - Not deployed publicly; `docs/deployment.md` explains how.

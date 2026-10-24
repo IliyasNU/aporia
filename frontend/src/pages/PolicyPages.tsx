@@ -60,7 +60,13 @@ export function PrivacyPage() {
       <h2>Logs</h2>
       <p>
         Servers keep short technical logs to keep the site running. They never contain passwords,
-        session tokens or subscription links, and they are rotated automatically.
+        session tokens, subscription links or email addresses, and they are rotated automatically.
+      </p>
+      <h2>Deleting things</h2>
+      <p>
+        When you delete an essay or a comment it disappears from the site at once and is removed
+        from the database for good after 30 days. Unsubscribed email addresses are removed after 30
+        days too.
       </p>
       <h2>Your choices</h2>
       <p>

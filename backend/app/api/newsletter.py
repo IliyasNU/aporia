@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, BackgroundTasks, Request, status
 
 from app.core import rate_limit
 from app.core.rate_limit import client_ip, limiter
@@ -27,7 +27,11 @@ CHECK_INBOX = (
     responses=error_responses(403, 404, 422, 429),
 )
 def subscribe(
-    author_id: uuid.UUID, data: SubscribeIn, request: Request, db: DbSession
+    author_id: uuid.UUID,
+    data: SubscribeIn,
+    request: Request,
+    background: BackgroundTasks,
+    db: DbSession,
 ) -> SubscribeOut:
     """Ask for new essays by email. Sends a confirmation link (double opt-in).
 
@@ -35,7 +39,10 @@ def subscribe(
     subscribed, so nobody can use this endpoint to learn who subscribes.
     """
     limiter.hit(rate_limit.SUBSCRIBE, client_ip(request))
-    newsletter.request_subscription(db, author_id, data.email)
+    message = newsletter.request_subscription(db, author_id, data.email)
+    if message is not None:
+        # After the response: every answer takes the same time, email or not.
+        background.add_task(newsletter.send_confirmation, message)
     return SubscribeOut(message=CHECK_INBOX)
 
 

@@ -5,6 +5,7 @@
     python -m app.cli delete-comment <comment-id>
     python -m app.cli delete-user ada@example.com          # account and everything it owns
     python -m app.cli delete-subscriber fan@example.com    # forget an address (SEC-06)
+    python -m app.cli requeue-failed-emails                # retry failed emails (after an SMTP fix)
     python -m app.cli seed-demo                            # demo data; refused in production
 
 In Docker: docker compose exec api python -m app.cli <command> ...
@@ -38,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser(
         "delete-subscriber", help="remove an email address from all newsletters"
     ).add_argument("email")
+    commands.add_parser("requeue-failed-emails", help="retry failed emails, e.g. after an SMTP fix")
     commands.add_parser("seed-demo", help="create clearly labelled demo data (not in production)")
     args = parser.parse_args(argv)
 
@@ -56,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "delete-subscriber":
                 count = maintenance.delete_subscriber(db, args.email)
                 print(f"Removed the address from {count} subscription(s)")
+            elif args.command == "requeue-failed-emails":
+                count = maintenance.requeue_failed_emails(db)
+                print(f"Requeued {count} failed email(s)")
             elif args.command == "seed-demo":
                 handles = demo.seed_demo(db)
                 if handles:

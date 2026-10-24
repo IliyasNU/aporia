@@ -56,12 +56,15 @@ free software; the only external service you need is an SMTP account for email.
    ```
 
    With `APP_ENV=production` the API refuses to start without a real `SECRET_KEY`, and
-   session cookies get the `Secure` flag (they then only work over HTTPS).
+   session cookies get the `Secure` flag (they then only work over HTTPS). Add
+   `API_DOCS_ENABLED=false` if you do not want the Swagger UI page (it loads a pinned
+   script from a CDN); the OpenAPI JSON stays available.
 
 4. **Remove `mailpit`** from the stack (delete the service or run
    `docker compose up -d db migrate api worker web`).
-5. **Do not publish ports 5432, 8000 or 8025.** The compose file binds them to
-   `127.0.0.1`, which keeps them off the internet; keep it that way.
+5. **Keep the internal ports private.** The API port is not published at all (only
+   nginx reaches it, which is what makes its `X-Forwarded-For` trustworthy); PostgreSQL
+   (5432) and Mailpit (8025) are bound to `127.0.0.1`. Keep it that way.
 6. **Start:** `docker compose up -d --build db migrate api worker web`.
 7. **Create an administrator:** sign up in the browser, then
    `docker compose exec api python -m app.cli set-role you@example.org admin`.
@@ -93,9 +96,22 @@ Keep backups somewhere else than the server, and test a restore once.
 ## Logs and data retention (SEC-06)
 
 - Container logs are rotated by Docker (3 × 10 MB per service, see `x-logging`).
-- They contain no passwords, session tokens, subscription links or subscriber addresses.
+- They contain no passwords, session tokens, subscription links or subscriber addresses
+  (SQL parameters are hidden and database error texts are not logged).
 - The worker deletes finished email jobs after `EMAIL_JOB_RETENTION_DAYS` (90), unconfirmed
-  subscriptions a week after their link expired, and sessions a day after they ended.
+  subscriptions a week after their link expired, sessions a day after they ended, and
+  deleted essays, comments and unsubscribed addresses after
+  `DELETED_CONTENT_RETENTION_DAYS` (30).
+
+## When email stops working
+
+If SMTP credentials are wrong or a sending quota is used up, the worker keeps the emails
+queued and retries (1, 5, 25, 125 minutes, up to 5 attempts). After fixing the cause,
+emails that already gave up can be sent again:
+
+```bash
+docker compose exec api python -m app.cli requeue-failed-emails
+```
 
 ## Scaling notes
 

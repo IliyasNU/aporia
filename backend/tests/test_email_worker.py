@@ -96,7 +96,7 @@ def test_temporary_failure_is_retried_later(
         "smtp_unavailable",
     )
     assert failed.next_retry_at > datetime.now(UTC)
-    assert process_one(db_session) is False  # not due yet
+    assert process_one(db_session) == "idle"  # not due yet
 
     outbox.failure = None
     db_session.execute(update(EmailJob).values(next_retry_at=datetime.now(UTC)))
