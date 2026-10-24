@@ -187,3 +187,15 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
 - **Explanations.** The reason is the component with the largest weighted contribution;
   ties prefer following, then interests, then popularity, then freshness.
 - **Privacy.** Nothing is tracked to recommend: no views, clicks or reading time.
+
+## Release hardening (Stage 7)
+
+- **Rate limits** (`app/core/rate_limit.py`): sliding windows in memory, keyed by client IP,
+  email or user id, with `429` and `Retry-After`. One API process makes this exact; with
+  several processes each would count separately (documented).
+- **Client IP:** nginx overwrites `X-Forwarded-For` with the address it sees, and uvicorn
+  (`--proxy-headers`, `FORWARDED_ALLOW_IPS`) trusts it because only nginx reaches the API.
+- **Request size:** nginx `client_max_body_size 512k` and an API middleware returning 413.
+- **Headers:** CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+- **Operations:** maintenance commands in `app/cli.py`; the worker also removes ended
+  sessions; Docker rotates logs; `scripts/e2e_smoke.py` checks the whole chain in CI.
