@@ -4,6 +4,7 @@ import argparse
 import logging
 import signal
 import time
+from pathlib import Path
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -43,6 +44,8 @@ def main() -> None:
             # e.g. the database restarting: log, wait, try again.
             logger.exception("Email worker iteration failed")
             sent = 0
+        # Tell the healthcheck (python -m app.worker.healthcheck) that the loop is alive.
+        Path(settings.worker_heartbeat_file).touch()
         if args.once:
             break
         if sent == 0:

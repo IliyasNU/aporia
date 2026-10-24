@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -219,3 +220,21 @@ def test_cleanup_removes_old_finished_jobs_and_stale_pending_subscriptions(
     assert db_session.scalar(select(EmailJob)) is None
     remaining = [s.email_normalized for s in db_session.scalars(select(EmailSubscription))]
     assert remaining == ["fan@example.com"]
+
+
+def test_worker_healthcheck_follows_the_heartbeat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    from app.core.config import get_settings
+    from app.worker.healthcheck import is_healthy
+
+    heartbeat = tmp_path / "heartbeat"
+    monkeypatch.setattr(get_settings(), "worker_heartbeat_file", str(heartbeat))
+
+    assert is_healthy() is False  # worker never ran
+    heartbeat.touch()
+    assert is_healthy() is True
+    stale = time.time() + get_settings().worker_heartbeat_max_age_seconds + 1
+    assert is_healthy(now=stale) is False
