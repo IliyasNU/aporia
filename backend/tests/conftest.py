@@ -112,3 +112,26 @@ def register(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def write_article(
+    client: TestClient,
+    *,
+    title: str = "On Doubt",
+    summary: str = "Why certainty is overrated.",
+    body: str = "Doubt is the beginning of wisdom.",
+    tags: list[str] | None = None,
+) -> dict[str, object]:
+    """Create a draft through the API as the client's signed-in user."""
+    response = client.post(
+        "/api/v1/articles",
+        json={"title": title, "summary": summary, "body_markdown": body, "tags": tags or []},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def publish(client: TestClient, article_id: object) -> dict[str, object]:
+    response = client.post(f"/api/v1/articles/{article_id}/publish")
+    assert response.status_code == 200, response.text
+    return response.json()
