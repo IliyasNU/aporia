@@ -25,6 +25,7 @@ from app.models import (
     EmailJobStatus,
     EmailSubscription,
     SubscriptionStatus,
+    UserSession,
 )
 from app.services import mailer
 from app.services.newsletter import unsubscribe_url
@@ -125,7 +126,8 @@ def run_batch(db: Session) -> int:
 
 
 def clean_up(db: Session) -> None:
-    """Data minimisation (SEC-06): drop finished jobs and abandoned pending subscriptions."""
+    """Data minimisation (SEC-06): drop finished jobs, abandoned pending subscriptions
+    and sessions that ended more than a day ago."""
     settings = get_settings()
     now = datetime.now(UTC)
     db.execute(
@@ -138,6 +140,12 @@ def clean_up(db: Session) -> None:
         delete(EmailSubscription).where(
             EmailSubscription.status == SubscriptionStatus.PENDING,
             EmailSubscription.token_expires_at < now - timedelta(days=7),
+        )
+    )
+    day_ago = now - timedelta(days=1)
+    db.execute(
+        delete(UserSession).where(
+            (UserSession.expires_at < day_ago) | (UserSession.revoked_at < day_ago)
         )
     )
     db.commit()

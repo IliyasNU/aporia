@@ -61,8 +61,16 @@ export function Layout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="border-t border-rule">
-        <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-muted">
-          Aporia · a home for philosophical essays
+        <div className="mx-auto flex max-w-3xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted">
+          <span>Aporia · a home for philosophical essays</span>
+          <nav aria-label="Site information" className="flex gap-4">
+            <Link to="/rules" className="hover:text-accent-strong">
+              Publication rules
+            </Link>
+            <Link to="/privacy" className="hover:text-accent-strong">
+              Privacy
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>

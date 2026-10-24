@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 class AppError(Exception):
     """An expected failure with a specific error code, e.g. AppError(409, "email_taken", ...)."""
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self, status_code: int, code: str, message: str, headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 ERROR_CODES = {
@@ -34,6 +37,7 @@ ERROR_CODES = {
     404: "not_found",
     405: "method_not_allowed",
     409: "conflict",
+    413: "payload_too_large",
     422: "validation_error",
     429: "rate_limited",
     500: "internal_error",
@@ -64,7 +68,7 @@ def error_response(
 
 
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-    return error_response(exc.status_code, exc.message, code=exc.code)
+    return error_response(exc.status_code, exc.message, code=exc.code, headers=exc.headers)
 
 
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:

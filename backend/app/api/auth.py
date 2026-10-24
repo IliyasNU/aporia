@@ -8,7 +8,9 @@ from app.api.deps import (
     clear_session_cookie,
     set_session_cookie,
 )
+from app.core import rate_limit
 from app.core.config import Settings
+from app.core.rate_limit import client_ip, limiter
 from app.db.session import DbSession
 from app.models import User
 from app.schemas.errors import error_responses
@@ -31,7 +33,7 @@ def start_session(
     "/register",
     status_code=status.HTTP_201_CREATED,
     response_model=MeOut,
-    responses=error_responses(403, 409, 422),
+    responses=error_responses(403, 409, 422, 429),
 )
 def register(
     data: RegisterRequest,
@@ -41,12 +43,13 @@ def register(
     settings: AppSettings,
 ) -> MeOut:
     """Create an account and sign in (sets the session cookie)."""
+    limiter.hit(rate_limit.REGISTER, client_ip(request))
     user = auth.register_user(db, data)
     start_session(db, user, request, response, settings)
     return MeOut.model_validate(user)
 
 
-@router.post("/login", response_model=MeOut, responses=error_responses(401, 403, 422))
+@router.post("/login", response_model=MeOut, responses=error_responses(401, 403, 422, 429))
 def login(
     data: LoginRequest,
     request: Request,
@@ -55,6 +58,9 @@ def login(
     settings: AppSettings,
 ) -> MeOut:
     """Sign in with email and password (sets the session cookie)."""
+    # Per IP against one attacker, per email against many machines guessing one account.
+    limiter.hit(rate_limit.LOGIN_PER_IP, client_ip(request))
+    limiter.hit(rate_limit.LOGIN_PER_EMAIL, data.email)
     user = auth.authenticate(db, data)
     start_session(db, user, request, response, settings)
     return MeOut.model_validate(user)

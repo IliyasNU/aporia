@@ -2,8 +2,10 @@
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
+from app.core import rate_limit
+from app.core.rate_limit import client_ip, limiter
 from app.db.session import DbSession
 from app.schemas.articles import AuthorBrief
 from app.schemas.errors import error_responses
@@ -22,14 +24,17 @@ CHECK_INBOX = (
     "/authors/{author_id}/newsletter-subscriptions",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=SubscribeOut,
-    responses=error_responses(403, 404, 422),
+    responses=error_responses(403, 404, 422, 429),
 )
-def subscribe(author_id: uuid.UUID, data: SubscribeIn, db: DbSession) -> SubscribeOut:
+def subscribe(
+    author_id: uuid.UUID, data: SubscribeIn, request: Request, db: DbSession
+) -> SubscribeOut:
     """Ask for new essays by email. Sends a confirmation link (double opt-in).
 
     The answer is the same whether the address is new, pending or already
     subscribed, so nobody can use this endpoint to learn who subscribes.
     """
+    limiter.hit(rate_limit.SUBSCRIBE, client_ip(request))
     newsletter.request_subscription(db, author_id, data.email)
     return SubscribeOut(message=CHECK_INBOX)
 

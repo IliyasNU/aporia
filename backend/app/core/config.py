@@ -34,6 +34,11 @@ class Settings(BaseSettings):
 
     session_ttl_days: int = Field(default=14, ge=1, le=90)
 
+    # SEC-03. Turned off in most tests; see app/core/rate_limit.py for the limits.
+    rate_limits_enabled: bool = True
+    # Requests with a bigger body are refused with 413 before any parsing.
+    max_body_bytes: int = Field(default=512 * 1024, ge=1024)
+
     # Signs unsubscribe links (see app/core/security.py). Must be a long random
     # value in production, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
     secret_key: SecretStr = SecretStr(DEV_SECRET_KEY)

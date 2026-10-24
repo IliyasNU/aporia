@@ -95,6 +95,8 @@ jobs:
         run: |
           test "$(docker compose ps worker --status running --quiet | wc -l)" = "1"
           curl --fail --silent --show-error http://127.0.0.1:8025/api/v1/info > /dev/null
+      - name: End-to-end chain (register → publish → email → recommendations)
+        run: python3 scripts/e2e_smoke.py
       - name: Show logs on failure
         if: failure()
         run: docker compose logs

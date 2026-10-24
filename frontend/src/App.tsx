@@ -13,6 +13,7 @@ import { ForYouPage } from './pages/ForYouPage'
 import { HomePage } from './pages/HomePage'
 import { ConfirmSubscriptionPage, UnsubscribePage } from './pages/NewsletterPages'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { PrivacyPage, RulesPage } from './pages/PolicyPages'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
 
@@ -36,6 +37,8 @@ export default function App() {
           <Route path="/for-you" element={<ForYouPage />} />
           <Route path="/articles/:slug" element={<ArticlePage />} />
           <Route path="/authors/:handle" element={<AuthorPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/rules" element={<RulesPage />} />
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/newsletter/confirm" element={<ConfirmSubscriptionPage />} />

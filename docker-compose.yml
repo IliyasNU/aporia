@@ -2,6 +2,13 @@
 # Usage: docker compose up --build   →   http://localhost:8080  (emails: http://localhost:8025)
 # Every value has a working default; override them in a root .env (see .env.example).
 
+# Keep container logs small (SEC-06): at most 3 files of 10 MB per service.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-backend-env: &backend-env
   APP_ENV: ${APP_ENV:-development}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -22,6 +29,7 @@ x-backend-env: &backend-env
 
 services:
   db:
+    logging: *logging
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aporia}
@@ -39,6 +47,7 @@ services:
 
   # One-off job: applies Alembic migrations, then exits. The API starts only after it succeeds.
   migrate:
+    logging: *logging
     build: ./backend
     command: ["alembic", "upgrade", "head"]
     environment: *backend-env
@@ -48,8 +57,13 @@ services:
     restart: "no"
 
   api:
+    logging: *logging
     build: ./backend
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      # Only nginx (web) and local tools reach the API, so the X-Forwarded-For
+      # header that nginx sets can be trusted. Never publish port 8000 publicly.
+      FORWARDED_ALLOW_IPS: "*"
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
@@ -59,6 +73,7 @@ services:
 
   # Sends queued "new essay" emails (one process, polls the email_jobs table).
   worker:
+    logging: *logging
     build: ./backend
     command: ["python", "-m", "app.worker"]
     environment: *backend-env
@@ -75,6 +90,7 @@ services:
     restart: unless-stopped
 
   web:
+    logging: *logging
     build: ./frontend
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:8080"
@@ -85,6 +101,7 @@ services:
 
   # Development only: an SMTP server that keeps every email in a web inbox.
   mailpit:
+    logging: *logging
     image: axllent/mailpit:v1.31.6
     ports:
       - "127.0.0.1:${MAILPIT_PORT:-8025}:8025" # web inbox
