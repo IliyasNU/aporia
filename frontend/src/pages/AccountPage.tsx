@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { listMyArticles } from '../api/articles'
+import { listBookmarks, listFollowing, unfollow } from '../api/social'
 import { ApiError, errorMessage } from '../api/client'
 import type { Me } from '../api/types'
 import { listTags, setInterests, updateProfile } from '../api/users'
@@ -43,6 +44,8 @@ export function AccountPage() {
       {notice && <Notice kind="success">{notice}</Notice>}
 
       <MyArticles />
+      <MyBookmarks />
+      <MyFollowing />
       <ProfileForm user={user} />
       <InterestsForm user={user} />
 
@@ -64,6 +67,90 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
     <h2 id={id} className="border-b border-rule pb-2 text-sm font-semibold tracking-wide uppercase">
       {children}
     </h2>
+  )
+}
+
+function MyBookmarks() {
+  const [page, setPage] = useState(1)
+  const saved = useAsync(`bookmarks:${page}`, (signal) => listBookmarks(page, signal))
+  return (
+    <section aria-labelledby="bookmarks-heading">
+      <SectionHeading id="bookmarks-heading">Saved essays</SectionHeading>
+      {saved.status === 'loading' && <Loading />}
+      {saved.status === 'error' && <ErrorState error={saved.error} onRetry={saved.reload} />}
+      {saved.status === 'success' &&
+        (saved.data.items.length === 0 ? (
+          <p className="mt-4 text-muted">Use “Save” on an essay to keep it here.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-rule">
+              {saved.data.items.map((article) => (
+                <li key={article.id} className="py-3">
+                  <Link
+                    to={`/articles/${encodeURIComponent(article.slug)}`}
+                    className="font-medium hover:text-accent-strong"
+                  >
+                    {article.title}
+                  </Link>
+                  <span className="text-sm text-muted"> · {article.author.display_name}</span>
+                </li>
+              ))}
+            </ul>
+            <Pagination page={page} pageSize={20} total={saved.data.total} onChange={setPage} />
+          </>
+        ))}
+    </section>
+  )
+}
+
+function MyFollowing() {
+  const following = useAsync('following-authors', listFollowing)
+  const [error, setError] = useState<string | null>(null)
+
+  async function stop(authorId: string) {
+    setError(null)
+    try {
+      await unfollow(authorId)
+      following.reload()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  return (
+    <section aria-labelledby="following-heading">
+      <SectionHeading id="following-heading">Authors you follow</SectionHeading>
+      {error && <Notice kind="error">{error}</Notice>}
+      {following.status === 'loading' && <Loading />}
+      {following.status === 'error' && (
+        <ErrorState error={following.error} onRetry={following.reload} />
+      )}
+      {following.status === 'success' &&
+        (following.data.length === 0 ? (
+          <p className="mt-4 text-muted">You do not follow anyone yet.</p>
+        ) : (
+          <ul className="divide-y divide-rule">
+            {following.data.map(({ author }) => (
+              <li key={author.id} className="flex items-center justify-between gap-2 py-3">
+                <Link
+                  to={`/authors/${author.handle}`}
+                  className="font-medium hover:text-accent-strong"
+                >
+                  {author.display_name}
+                </Link>
+                <button
+                  type="button"
+                  className={`${secondaryButton} px-3 py-1 text-sm`}
+                  onClick={() => stop(author.id)}
+                  aria-label={`Unfollow ${author.display_name}`}
+                >
+                  Unfollow
+                </button>
+              </li>
+            ))}
+          </ul>
+        ))}
+    </section>
   )
 }
 

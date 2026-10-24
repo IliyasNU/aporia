@@ -135,3 +135,21 @@ def publish(client: TestClient, article_id: object) -> dict[str, object]:
     response = client.post(f"/api/v1/articles/{article_id}/publish")
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def signed_in(
+    make_client: Callable[[], TestClient], handle: str, display_name: str | None = None
+) -> TestClient:
+    """A new browser session for a freshly registered user named after the handle."""
+    client = make_client()
+    register(
+        client,
+        email=f"{handle}@example.com",
+        handle=handle,
+        display_name=display_name or handle.capitalize(),
+    )
+    return client
+
+
+def me(client: TestClient) -> dict[str, object]:
+    return client.get("/api/v1/auth/me").json()
