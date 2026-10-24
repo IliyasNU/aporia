@@ -4,9 +4,15 @@ import type { ArticleListItem } from '../api/types'
 import { formatDate } from '../lib/format'
 import { TagChips } from './TagChips'
 
-export function ArticleCard({ article }: { article: ArticleListItem }) {
+export function ArticleCard({ article, reason }: { article: ArticleListItem; reason?: string }) {
   return (
     <article className="border-b border-rule py-6">
+      {reason && (
+        <p className="mb-1 text-sm font-medium text-accent-strong">
+          <span className="sr-only">Why this essay: </span>
+          {reason}
+        </p>
+      )}
       <h2 className="font-serif text-2xl leading-snug font-semibold">
         <Link
           to={`/articles/${encodeURIComponent(article.slug)}`}

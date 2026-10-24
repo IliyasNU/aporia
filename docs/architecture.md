@@ -172,3 +172,18 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   Before sending it re-checks that the subscription is confirmed and the essay public.
 - **Header injection:** subjects are built from user content (titles), so newlines are
   collapsed before they become headers.
+
+## Recommendations (Stage 6)
+
+- **Two layers.** `ranking.py` is pure: it takes plain dataclasses (`Candidate`, `Reader`)
+  and a fixed `now`, and returns a ranked list. No database or clock inside, so tests can
+  use hand-calculated examples. `recommendations.py` does the I/O: one query for
+  candidates (with authors and tags), one for bookmark counts, one each for the reader's
+  interests and follows: always 4 queries, however many essays.
+- **Bounded work.** Only the newest 300 public essays are candidates; the greedy diversity
+  step is O(n²) over them, which stays well under 100 ms.
+- **Limiting hits.** Popularity uses `log1p`, so an essay with 10 bookmarks keeps about a
+  third of the signal of one with 1000.
+- **Explanations.** The reason is the component with the largest weighted contribution;
+  ties prefer following, then interests, then popularity, then freshness.
+- **Privacy.** Nothing is tracked to recommend: no views, clicks or reading time.

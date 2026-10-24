@@ -4,9 +4,10 @@ A publishing platform for philosophical essays: authors publish, readers follow 
 subscribe to email updates and get transparent, explainable recommendations.
 Built with FastAPI, React and PostgreSQL.
 
-> **Status: Stage 5 (Email).** Accounts, publishing, search, follows, bookmarks, comments,
-> moderation and double opt-in email subscriptions with a sending worker work end to end.
-> Recommendations are **not implemented yet**. See [docs/roadmap.md](docs/roadmap.md).
+> **Status: Stage 6 (Recommendations).** Every v1.0 feature is implemented: accounts,
+> publishing, search, follows, bookmarks, comments, moderation, double opt-in email
+> subscriptions and explainable recommendations. Stage 7 (release hardening) is next. See
+> [docs/roadmap.md](docs/roadmap.md).
 
 ## Quick start (Docker)
 
@@ -115,6 +116,7 @@ is in the OpenAPI docs at `/api/v1/docs`. Errors always look like
 | `GET /admin/reports`, `POST /admin/moderate`               | admin        | Review reports; hide or unhide content                        |
 | `POST /authors/{id}/newsletter-subscriptions`              | —            | Subscribe by email (double opt-in), always `202`              |
 | `POST /newsletter/confirm`, `POST /newsletter/unsubscribe` | token        | Confirm / stop a subscription                                 |
+| `GET /feed/recommended`                                    | optional     | Ranked essays with a `reason` each; cold start for guests     |
 
 Signing in sets an `HttpOnly`, `SameSite=Lax` session cookie (`Secure` when
 `APP_ENV=production`). `POST`, `PATCH`, `PUT` and `DELETE` requests sent by a browser must
@@ -164,6 +166,29 @@ run `mailpit` in production. No paid email service is required or configured.
 
 Finished jobs are deleted after `EMAIL_JOB_RETENTION_DAYS` (90) and never-confirmed
 subscriptions a week after their link expired.
+
+## Recommendations
+
+`GET /api/v1/feed/recommended` (the "For you" page) ranks the newest 300 public essays
+with one transparent formula, implemented as a pure function in
+`backend/app/services/ranking.py`:
+
+```
+score = 0.40 * tag_match    # share of the essay's tags among your interests (0..1)
+      + 0.25 * following    # 1 if you follow the author
+      + 0.15 * popularity   # log1p(bookmarks), relative to the most bookmarked candidate
+      + 0.15 * freshness    # exp(-age_days / 30)
+      + 0.05 * diversity    # share of the essay's tags not already shown above it
+order: score DESC, published_at DESC, id DESC
+```
+
+- Each item carries a `reason` (its largest weighted signal): "You are interested in
+  Ethics", "You follow David Hume", "Popular with readers" or "Recently published".
+- Guests and readers without interests or follows get the same formula with only
+  popularity, freshness and diversity (cold start, `cold_start: true`), so the feed is
+  never empty and new essays without bookmarks still appear.
+- Your own essays, essays you saved, and anything not public are left out.
+- No embeddings, no LLMs, no click tracking: only interests, follows, bookmarks and dates.
 
 ## Moderation
 
@@ -231,6 +256,8 @@ What is checked automatically on every push and pull request
 | Worker: send, retry with backoff, give up, permanent failure, cancel, cleanup                 | Automatic |
 | Worker: publishing works with SMTP down; logs hold no addresses or tokens                     | Automatic |
 | Docker Compose: worker and Mailpit running                                                    | Automatic |
+| Ranking: hand-calculated scenario, weights, log popularity, decay, diversity, ties            | Automatic |
+| Feed: cold start for guests, reasons, excludes own/saved/non-public, 4 queries                | Automatic |
 | No passwords, session tokens or emails in application logs                                    | Automatic |
 | Migrations apply to an empty database, downgrade and re-apply                                 | Automatic |
 | ORM models match migrations (`alembic check`)                                                 | Automatic |
@@ -245,6 +272,7 @@ What is checked automatically on every push and pull request
 | Keyboard: skip link first, visible focus; no horizontal scroll at 360 px                      | Manual    |
 | Two readers and an admin in Chromium: save, follow, comment, report, hide via CLI-made admin  | Manual    |
 | Real emails via Mailpit: subscribe → confirm → new essay → unsubscribe; SMTP outage and retry | Manual    |
+| "For you" in Chromium: guest cold start and personalised reasons at 360 px                    | Manual    |
 
 ## Project structure
 
