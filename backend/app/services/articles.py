@@ -107,6 +107,10 @@ def create_article(db: Session, author: User, data: ArticleCreate) -> Article:
 def update_article(db: Session, article: Article, changes: ArticleUpdate) -> Article:
     """Edit any field; editing never re-sends notifications (US-07)."""
     data = changes.model_dump(exclude_unset=True, exclude={"tags"})
+    emptied = "body_markdown" in data and not data["body_markdown"].strip()
+    if emptied and article.status == ArticleStatus.PUBLISHED:
+        # A public essay must stay non-empty; unpublish it instead.
+        raise AppError(422, "empty_body", "A published essay cannot be empty")
     for field, value in data.items():
         setattr(article, field, value)
     if "title" in data and article.published_at is None:

@@ -1,6 +1,7 @@
 # Roadmap (v1.0 MVP)
 
-Each stage is a separate pull request into `main`. Nothing is merged without the
+Each stage is a separate pull request. They are stacked (each targets the previous
+stage's branch) until the owner merges them in order; nothing is merged without the
 owner's approval. Requirement IDs refer to the v1.0 product requirements.
 
 | Stage | Scope                                                         | Requirements              | Status        |
@@ -12,7 +13,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | **In review** |
 | 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | **In review** |
 | 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | **In review** |
-| 7     | Release: security hardening, Docker smoke, docs, demo         | SEC-01 … SEC-07           | Not started   |
+| 7     | Release: security hardening, Docker smoke, docs, demo         | SEC-01 … SEC-07           | **In review** |
 
 ## Stage 0: what exists
 
@@ -100,3 +101,14 @@ Screens (React Router, all wired to the real API):
 - `app/services/recommendations.py`: loads candidates and signals in 4 queries.
 - `GET /feed/recommended` for guests and signed-in readers (`cold_start` flag), paginated.
 - UI: "For you" page with a reason on every card and hints for cold start.
+
+## Stage 7: what exists
+
+- Rate limits (registration, login, subscriptions, comments, reports), 413 for bodies over
+  512 KB, Content-Security-Policy and other headers, trusted client IPs behind nginx.
+- Admin commands: `delete-article`, `delete-comment`, `delete-user`, `delete-subscriber`,
+  `seed-demo`; cleanup of ended sessions; Docker log rotation.
+- Privacy notice and publication rules pages.
+- `scripts/e2e_smoke.py` in CI; deployment guide, codebase guide, security overview, demo
+  script, release checklist, changelog.
+- An independent audit of the release branch, with confirmed findings fixed.

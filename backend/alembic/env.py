@@ -31,7 +31,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(get_settings().database_url.get_secret_value(), poolclass=pool.NullPool)
+    engine = create_engine(
+        get_settings().database_url.get_secret_value(),
+        poolclass=pool.NullPool,
+        hide_parameters=True,
+    )
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
