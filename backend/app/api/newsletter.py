@@ -4,7 +4,9 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Request, status
 
+from app.api.deps import AppSettings
 from app.core import rate_limit
+from app.core.errors import AppError
 from app.core.rate_limit import client_ip, limiter
 from app.db.session import DbSession
 from app.schemas.articles import AuthorBrief
@@ -24,7 +26,7 @@ CHECK_INBOX = (
     "/authors/{author_id}/newsletter-subscriptions",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=SubscribeOut,
-    responses=error_responses(403, 404, 422, 429),
+    responses=error_responses(403, 404, 422, 429, 503),
 )
 def subscribe(
     author_id: uuid.UUID,
@@ -32,12 +34,17 @@ def subscribe(
     request: Request,
     background: BackgroundTasks,
     db: DbSession,
+    settings: AppSettings,
 ) -> SubscribeOut:
     """Ask for new essays by email. Sends a confirmation link (double opt-in).
 
     The answer is the same whether the address is new, pending or already
     subscribed, so nobody can use this endpoint to learn who subscribes.
     """
+    if not settings.email_enabled:
+        raise AppError(
+            503, "email_unavailable", "Email subscriptions are not available on this site yet."
+        )
     limiter.hit(rate_limit.SUBSCRIBE, client_ip(request))
     message = newsletter.request_subscription(db, author_id, data.email)
     if message is not None:

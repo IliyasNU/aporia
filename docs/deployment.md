@@ -1,10 +1,102 @@
 # Deploying Aporia
 
-Aporia v1.0 has **not** been deployed publicly by the authors of this repository. This
-guide describes how the owner can run it on a single server they control. It uses only
-free software; the only external service you need is an SMTP account for email.
+Two ways to put Aporia on the internet:
 
-## What runs
+- **[Render's free plan](#render-free-plan)**: one click, using the Blueprint in
+  `render.yaml`. Costs nothing, but the site sleeps when nobody visits and the free
+  database expires after 30 days.
+- **[Your own server](#your-own-server-docker-compose)** with Docker Compose: the same
+  stack as on your machine, behind HTTPS.
+
+Both use only free software. The only external service you may want is an SMTP account
+for email.
+
+## Render (free plan)
+
+`render.yaml` describes two resources, both on Render's free plan:
+
+- a **web service** built from `deploy/Dockerfile`: one container in which nginx serves
+  the app and forwards `/api` to the API, with the email worker running beside them
+  (`deploy/start.sh` starts all three and applies migrations first);
+- a **PostgreSQL 16 database** that only Render's private network can reach.
+
+### Deploy
+
+1. Sign up at [render.com](https://dashboard.render.com/register) (GitHub sign-in works).
+   **Do not add a payment method.** Without one, Render suspends free services when a
+   monthly allowance runs out instead of billing you.
+2. Open <https://render.com/deploy?repo=https://github.com/IliyasNU/aporia>, check that
+   both resources say _Free_ and click **Deploy Blueprint**. Leave the SMTP fields empty
+   unless you already have an email provider (see [Email on Render](#email-on-render)).
+3. The first build takes a few minutes. The address is on the service's page, for example
+   `https://aporia.onrender.com` (or `aporia-xxxx` if the name is taken).
+   `PUBLIC_BASE_URL` and `TRUSTED_ORIGINS` default to it (Render's `RENDER_EXTERNAL_URL`);
+   set them yourself only for a custom domain.
+4. **Become an administrator.** Sign up on the site first, then add `ADMIN_EMAIL` with
+   that address under the service's _Environment_ and save. Every start of the service
+   gives that account the admin role. Sign up first: whoever registers the address
+   becomes the administrator.
+
+From then on, every push to `main` deploys automatically once CI has passed on it
+(`autoDeployTrigger: checksPass`).
+
+### Email on Render
+
+Free web services cannot connect to ports 25, 465 and 587, so use a provider that also
+accepts SMTP on port **2525** with STARTTLS (Brevo, Mailgun, SendGrid and SMTP2GO do;
+most have a free tier). Set `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD` and
+`MAIL_FROM` (an address the provider lets you send from) under _Environment_;
+`SMTP_PORT=2525` and `SMTP_STARTTLS=true` are already set.
+
+Until `SMTP_HOST` is set, the site works normally but email subscriptions are switched
+off: the form says they are not available yet (`503 email_unavailable`) and nothing is
+queued.
+
+### Free plan limits
+
+From [Render's documentation](https://render.com/docs/free):
+
+- The service **sleeps after 15 minutes without visitors**. The next visit wakes it in
+  about a minute (Render shows a loading page). The email worker sleeps too, so emails
+  queued in the meantime go out when it wakes.
+- 750 free instance hours per workspace and month: enough for one service all month.
+- 0.1 CPU and 512 MB RAM: signing in (Argon2id) takes a moment.
+- **The free database expires 30 days after creation**, is deleted 14 days later and has
+  no backups. Before then, upgrade it or [move the data](#moving-the-database) to another
+  free PostgreSQL, such as a Neon project.
+- No shell (hence `ADMIN_EMAIL`), and Render may restart free services at any time.
+
+### Visitor addresses and rate limits
+
+Rate limits count requests per visitor address. Render's proxy _appends_ the address it
+sees to `X-Forwarded-For` and keeps whatever the visitor sent before it, so only the last
+entry can be trusted. The image's nginx uses exactly that entry
+(`REAL_IP_HEADER=X-Forwarded-For` and `real_ip_header` in `deploy/nginx.conf`); CI checks
+it. On another host, set `REAL_IP_HEADER` to the header its load balancer sets, such as
+`Fly-Client-IP` on Fly.io.
+
+### Moving the database
+
+1. Create the new database and copy its URL (a `postgresql://…?sslmode=require` URL from
+   Neon works as is; the app adds the driver name itself).
+2. In Render, allow your IP address under the old database's _Networking_ settings and
+   copy its _External Database URL_.
+3. Copy the data:
+
+   ```bash
+   pg_dump --format=custom --no-owner "$OLD_URL" > aporia.dump
+   pg_restore --no-owner --dbname "$NEW_URL" aporia.dump
+   ```
+
+4. Set `DATABASE_URL` on the web service to the new URL and save. Remove your IP address
+   from the old database.
+
+The same external URL lets you run the maintenance commands from your machine, for
+example `cd backend && DATABASE_URL="$OLD_URL" uv run python -m app.cli requeue-failed-emails`.
+
+## Your own server (Docker Compose)
+
+### What runs
 
 | Service   | Image / command                     | Public?                       |
 | --------- | ----------------------------------- | ----------------------------- |
@@ -15,7 +107,7 @@ free software; the only external service you need is an SMTP account for email.
 | `db`      | PostgreSQL 16                       | No                            |
 | `mailpit` | development SMTP catcher            | **Do not run in production**  |
 
-## Checklist
+### Checklist
 
 1. **A server** with Docker and the Compose plugin, and a domain name pointing to it.
 2. **HTTPS in front of `web`** (SEC-04). The simplest option is [Caddy](https://caddyserver.com),
@@ -71,7 +163,7 @@ free software; the only external service you need is an SMTP account for email.
 8. **Check:** `curl https://aporia.example.org/api/v1/health` returns
    `{"status":"ok","database":"ok"}`; sign up, publish, subscribe with your own address.
 
-## Updating
+### Updating
 
 ```bash
 git pull
@@ -81,7 +173,7 @@ docker compose up -d --build db migrate api worker web
 `migrate` applies new Alembic migrations before the API starts. Migrations only move
 forward in production; take a backup first.
 
-## Backups
+### Backups
 
 The data lives in the `db-data` Docker volume. A daily logical backup:
 
@@ -95,7 +187,8 @@ Keep backups somewhere else than the server, and test a restore once.
 
 ## Logs and data retention (SEC-06)
 
-- Container logs are rotated by Docker (3 × 10 MB per service, see `x-logging`).
+- Container logs are rotated by Docker (3 × 10 MB per service, see `x-logging`); Render
+  keeps its own log history.
 - They contain no passwords, session tokens, subscription links or subscriber addresses
   (SQL parameters are hidden and database error texts are not logged).
 - The worker deletes finished email jobs after `EMAIL_JOB_RETENTION_DAYS` (90), unconfirmed
@@ -112,6 +205,9 @@ emails that already gave up can be sent again:
 ```bash
 docker compose exec api python -m app.cli requeue-failed-emails
 ```
+
+On Render, run it from your machine with the database's external URL (see
+[Moving the database](#moving-the-database)).
 
 ## Scaling notes
 

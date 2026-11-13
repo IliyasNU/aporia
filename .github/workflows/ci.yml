@@ -103,3 +103,65 @@ jobs:
       - name: Stop the stack
         if: always()
         run: docker compose down --volumes
+
+  image:
+    name: Single-container image (Render)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build deploy/Dockerfile
+        run: docker build --file deploy/Dockerfile --tag aporia-single .
+      - name: Start PostgreSQL and Mailpit
+        run: |
+          docker network create aporia
+          docker run --detach --name db --network aporia \
+            -e POSTGRES_USER=aporia -e POSTGRES_PASSWORD=aporia -e POSTGRES_DB=aporia \
+            --health-cmd "pg_isready -U aporia -d aporia" --health-interval 2s postgres:16-alpine
+          docker run --detach --name mailpit --network aporia -p 127.0.0.1:8025:8025 \
+            axllent/mailpit:v1.31.6
+          until [ "$(docker inspect --format '{{.State.Health.Status}}' db)" = healthy ]; do sleep 1; done
+      # Settings as Render passes them: a postgresql:// URL, PORT=10000 and
+      # RENDER_EXTERNAL_URL, from which start.sh derives PUBLIC_BASE_URL and
+      # TRUSTED_ORIGINS. APP_ENV stays "development": production cookies need HTTPS.
+      - name: Start the image the way Render runs it
+        run: |
+          docker run --detach --name app --network aporia -p 127.0.0.1:8080:10000 \
+            -e PORT=10000 \
+            -e DATABASE_URL=postgresql://aporia:aporia@db:5432/aporia \
+            -e RENDER_EXTERNAL_URL=http://127.0.0.1:8080 \
+            -e SMTP_HOST=mailpit -e SMTP_PORT=1025 \
+            -e ADMIN_EMAIL=nobody@example.com \
+            aporia-single
+          curl --retry 30 --retry-delay 2 --retry-all-errors --fail --silent --show-error \
+            http://127.0.0.1:8080/api/v1/health
+      - name: Web app with its security headers
+        run: |
+          curl --fail --silent --show-error --dump-header headers.txt http://127.0.0.1:8080/ \
+            | grep -q '<div id="root">'
+          grep -qi '^content-security-policy:' headers.txt
+      - name: End-to-end chain (register → publish → email → recommendations)
+        run: python3 scripts/e2e_smoke.py
+      - name: The last X-Forwarded-For entry is the visitor's address (nginx and API)
+        run: |
+          curl --fail --silent --output /dev/null \
+            -H 'X-Forwarded-For: 198.51.100.1, 203.0.113.7' http://127.0.0.1:8080/api/v1/tags
+          docker logs app 2>&1 | grep -q '^203.0.113.7 .*"GET /api/v1/tags'
+          docker logs app 2>&1 | grep -q '203.0.113.7:0 - "GET /api/v1/tags'
+      - name: Without SMTP_HOST the site runs and subscribing is switched off
+        run: |
+          docker run --detach --name app-no-email --network aporia -p 127.0.0.1:8081:8080 \
+            -e DATABASE_URL=postgresql://aporia:aporia@db:5432/aporia \
+            -e PUBLIC_BASE_URL=http://127.0.0.1:8081 \
+            aporia-single
+          curl --retry 30 --retry-delay 2 --retry-all-errors --fail --silent --output /dev/null \
+            http://127.0.0.1:8081/api/v1/health
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST \
+            -H 'Origin: http://127.0.0.1:8081' -H 'Content-Type: application/json' \
+            --data '{"email": "fan@example.com"}' \
+            http://127.0.0.1:8081/api/v1/authors/00000000-0000-0000-0000-000000000000/newsletter-subscriptions)
+          test "$status" = 503
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker logs app || true
+          docker logs app-no-email || true

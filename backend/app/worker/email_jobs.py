@@ -124,8 +124,13 @@ def process_one(db: Session) -> str:
 
 
 def run_batch(db: Session) -> int:
-    """Send up to WORKER_BATCH_SIZE due emails, pausing between them. Returns how many."""
+    """Send up to WORKER_BATCH_SIZE due emails, pausing between them. Returns how many.
+
+    With EMAIL_ENABLED off, queued emails wait (for an SMTP account) instead of failing.
+    """
     settings = get_settings()
+    if not settings.email_enabled:
+        return 0
     handled = 0
     while handled < settings.worker_batch_size:
         outcome = process_one(db)

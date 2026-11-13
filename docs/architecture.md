@@ -206,3 +206,25 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
 - **Headers:** CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Operations:** maintenance commands in `app/cli.py`; the worker also removes ended
   sessions; Docker rotates logs; `scripts/e2e_smoke.py` checks the whole chain in CI.
+
+## Hosting on Render's free plan (after v1.0)
+
+- **One container.** A free Render web service is a single container, and background
+  workers are not free, so `deploy/Dockerfile` puts nginx, the API and the worker in one
+  image. `deploy/start.sh` applies migrations and runs the three side by side; when one
+  exits, the container exits and Render restarts it. nginx reuses `frontend/nginx.conf`,
+  so headers and CSP match Compose. Compose keeps one process per container.
+- **Platform-style settings.** `DATABASE_URL` may be a `postgres://` or `postgresql://`
+  URL (the driver name is added), and a variable left blank means "use the default".
+- **No SMTP account, no pretending.** Without `SMTP_HOST`, `start.sh` sets
+  `EMAIL_ENABLED=false`: subscribing answers `503 email_unavailable` and the worker leaves
+  queued emails alone, instead of promising emails that would never arrive.
+- **Client IP.** Render's proxy appends to `X-Forwarded-For`, so nginx's `real_ip` takes
+  the last entry (`REAL_IP_HEADER`), and uvicorn trusts nginx on localhost (its default).
+- **Admin without a shell.** `ADMIN_EMAIL` gives that existing account the admin role on
+  every start, because the free plan offers no shell for `python -m app.cli set-role`.
+- **512 MB of memory.** Argon2id needs 64 MiB per hash, so at most two hashes or checks
+  run at once (`app/core/security.py`); a burst of sign-ins waits instead of running the
+  instance out of memory.
+- CI builds the image and runs it the way Render does (a `postgresql://` URL,
+  `PORT=10000`, `RENDER_EXTERNAL_URL`), including the end-to-end email chain.

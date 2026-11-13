@@ -1,0 +1,12 @@
+# For images built from the repository root (deploy/Dockerfile). The Compose images
+# build from backend/ and frontend/ and use the .dockerignore files there.
+.git
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.env
+**/.env.*
+backend/tests

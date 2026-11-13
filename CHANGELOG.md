@@ -1,9 +1,25 @@
 # Changelog
 
-## v1.0.0: release candidate (not yet merged)
+## Unreleased
+
+### Hosting
+
+- One-click deployment on Render's free plan: `render.yaml` (a free web service and a
+  free PostgreSQL 16 database) and a single-container image in `deploy/` (nginx, API and
+  email worker), built and tested end to end in CI the way Render runs it.
+- `DATABASE_URL` accepts `postgres://` and `postgresql://` URLs; blank variables use the
+  defaults.
+- `EMAIL_ENABLED`: without an SMTP account the site runs with email subscriptions
+  switched off (`503 email_unavailable`) instead of queueing emails that cannot be sent.
+- `ADMIN_EMAIL` (single-container image): makes an existing account an administrator on
+  hosts without a shell.
+- At most two Argon2id hashes run at once (64 MiB each), so a burst of sign-ins cannot
+  run a 512 MB instance out of memory.
+
+## v1.0.0 (2026-11-13)
 
 The first complete version of Aporia, built in seven stacked pull requests
-(Stage 0 to Stage 7).
+(Stage 0 to Stage 7) and merged into `main` on 2026-11-13.
 
 ### Features
 
