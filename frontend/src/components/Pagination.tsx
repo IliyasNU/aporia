@@ -5,13 +5,14 @@ type Props = {
   onChange: (page: number) => void
 }
 
+/** Newer / older pages under a list (hidden when one page is enough). */
 export function Pagination({ page, pageSize, total, onChange }: Props) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
   if (pages <= 1) return null
   const button =
-    'rounded-md border border-rule px-3 py-1.5 hover:border-accent disabled:cursor-not-allowed disabled:opacity-40'
+    'rounded-[3px] border border-rule bg-white px-2 py-1 text-[13px] text-[#3b4045] hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40'
   return (
-    <nav aria-label="Pagination" className="mt-8 flex items-center justify-between gap-4">
+    <nav aria-label="Pagination" className="mt-6 flex items-center gap-2 px-1">
       <button
         type="button"
         className={button}
@@ -20,7 +21,7 @@ export function Pagination({ page, pageSize, total, onChange }: Props) {
       >
         ← Newer
       </button>
-      <span className="text-sm text-muted">
+      <span className="rounded-[3px] bg-orange px-2 py-1 text-[13px] text-white">
         Page {page} of {pages}
       </span>
       <button

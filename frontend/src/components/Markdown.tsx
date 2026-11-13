@@ -23,7 +23,7 @@ const components: Components = {
 
 export function Markdown({ source }: { source: string }) {
   return (
-    <div className="prose prose-stone prose-lg max-w-none font-serif prose-headings:font-semibold prose-a:text-accent-strong">
+    <div className="prose prose-slate max-w-none text-[15px] leading-relaxed prose-headings:font-semibold prose-a:text-accent prose-code:rounded prose-code:bg-hover prose-code:px-1 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-hover prose-pre:text-ink">
       <ReactMarkdown skipHtml components={components}>
         {source}
       </ReactMarkdown>

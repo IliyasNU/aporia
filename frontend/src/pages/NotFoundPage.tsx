@@ -6,7 +6,7 @@ export function NotFoundPage({ what = 'page' }: { what?: string }) {
   useDocumentTitle('Not found')
   return (
     <div>
-      <h1 className="font-serif text-3xl font-semibold">This {what} does not exist</h1>
+      <h1 className="text-2xl font-bold sm:text-3xl">This {what} does not exist</h1>
       <p className="mt-4 text-muted">
         It may have been unpublished or deleted.{' '}
         <Link to="/" className="font-medium text-accent-strong underline">

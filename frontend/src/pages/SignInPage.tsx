@@ -37,8 +37,8 @@ export function SignInPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <h1 className="font-serif text-3xl font-semibold">Sign in</h1>
+    <div className="mx-auto max-w-md rounded-md border border-rule bg-white p-6 shadow-xs">
+      <h1 className="text-2xl font-bold sm:text-3xl">Sign in</h1>
       <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
         {error && <Notice kind="error">{error}</Notice>}
         <TextField

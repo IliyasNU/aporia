@@ -5,6 +5,9 @@ import { report, type ReportTarget } from '../api/social'
 import { secondaryButton } from './buttons'
 import { TextArea } from './Field'
 
+// What readers call each kind of report target.
+const nouns: Record<ReportTarget, string> = { article: 'essay', comment: 'comment' }
+
 /** "Report" link that opens a short form; reports go to the administrators (MOD-01). */
 export function ReportButton({
   targetType,
@@ -45,15 +48,19 @@ export function ReportButton({
   }
   if (!open) {
     return (
-      <button type="button" className="text-sm text-muted underline" onClick={() => setOpen(true)}>
+      <button type="button" className="text-muted hover:text-ink" onClick={() => setOpen(true)}>
         Report
       </button>
     )
   }
   return (
-    <form onSubmit={submit} className="mt-2 space-y-2" aria-label={`Report this ${targetType}`}>
+    <form
+      onSubmit={submit}
+      className="mt-2 space-y-2"
+      aria-label={`Report this ${nouns[targetType]}`}
+    >
       <TextArea
-        label={`Why should this ${targetType} be removed?`}
+        label={`Why should this ${nouns[targetType]} be removed?`}
         rows={2}
         required
         maxLength={500}

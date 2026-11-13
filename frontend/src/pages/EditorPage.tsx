@@ -142,9 +142,7 @@ function ArticleEditor({ article: initial }: { article: Article | null }) {
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-serif text-3xl font-semibold">
-          {article ? 'Edit essay' : 'New essay'}
-        </h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">{article ? 'Edit essay' : 'New essay'}</h1>
         {article && (
           <p className="text-sm text-muted">
             Status: <strong className="text-ink">{article.status}</strong>

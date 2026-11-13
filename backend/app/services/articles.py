@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.errors import AppError
-from app.models import Article, ArticleStatus, Bookmark, ModerationStatus, Tag, User
+from app.models import Article, ArticleStatus, ModerationStatus, Tag, User
 from app.schemas.articles import ArticleCreate, ArticleUpdate
 from app.services.newsletter import queue_new_article_emails
 from app.services.tags import resolve_tags
@@ -192,13 +192,7 @@ def list_public_articles(
         query = query.join(Article.author).where(User.handle == author.strip().lower())
     if sort == "popular":
         # Most bookmarked first; ties fall back to the newest.
-        bookmarks = (
-            select(func.count())
-            .where(Bookmark.article_id == Article.id)
-            .correlate(Article)
-            .scalar_subquery()
-        )
-        query = query.order_by(bookmarks.desc())
+        query = query.order_by(Article.bookmark_count.desc())
     # The id makes the order stable for equal timestamps.
     query = query.order_by(Article.published_at.desc(), Article.id.desc())
     return paginate(db, query, page, page_size)

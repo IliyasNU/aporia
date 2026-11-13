@@ -10,6 +10,7 @@ import { useAuth } from '../auth/context'
 import { primaryButton, secondaryButton } from '../components/buttons'
 import { TextArea, TextField } from '../components/Field'
 import { Pagination } from '../components/Pagination'
+import { PageTitle, Panel } from '../components/Panel'
 import { Empty, ErrorState, Loading, Notice } from '../components/States'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -34,9 +35,9 @@ export function AccountPage() {
   }
 
   return (
-    <div className="space-y-12">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="font-serif text-3xl font-semibold">Your account</h1>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <PageTitle>Your account</PageTitle>
         <Link to={`/authors/${user.handle}`} className="text-accent-strong underline">
           View your public profile
         </Link>
@@ -49,7 +50,7 @@ export function AccountPage() {
       <ProfileForm user={user} />
       <InterestsForm user={user} />
 
-      <section aria-labelledby="signout-heading" className="border-t border-rule pt-6">
+      <section aria-labelledby="signout-heading">
         <h2 id="signout-heading" className="sr-only">
           Sign out
         </h2>
@@ -62,33 +63,24 @@ export function AccountPage() {
   )
 }
 
-function SectionHeading({ id, children }: { id: string; children: string }) {
-  return (
-    <h2 id={id} className="border-b border-rule pb-2 text-sm font-semibold tracking-wide uppercase">
-      {children}
-    </h2>
-  )
-}
-
 function MyBookmarks() {
   const [page, setPage] = useState(1)
   const saved = useAsync(`bookmarks:${page}`, (signal) => listBookmarks(page, signal))
   return (
-    <section aria-labelledby="bookmarks-heading">
-      <SectionHeading id="bookmarks-heading">Saved essays</SectionHeading>
+    <Panel title="Saved essays">
       {saved.status === 'loading' && <Loading />}
       {saved.status === 'error' && <ErrorState error={saved.error} onRetry={saved.reload} />}
       {saved.status === 'success' &&
         (saved.data.items.length === 0 ? (
-          <p className="mt-4 text-muted">Use “Save” on an essay to keep it here.</p>
+          <p className="p-4 text-muted">Use “Save” on an essay to keep it here.</p>
         ) : (
           <>
             <ul className="divide-y divide-rule">
               {saved.data.items.map((article) => (
-                <li key={article.id} className="py-3">
+                <li key={article.id} className="px-4 py-3">
                   <Link
                     to={`/articles/${encodeURIComponent(article.slug)}`}
-                    className="font-medium hover:text-accent-strong"
+                    className="font-medium text-accent hover:underline"
                   >
                     {article.title}
                   </Link>
@@ -99,7 +91,7 @@ function MyBookmarks() {
             <Pagination page={page} pageSize={20} total={saved.data.total} onChange={setPage} />
           </>
         ))}
-    </section>
+    </Panel>
   )
 }
 
@@ -118,8 +110,7 @@ function MyFollowing() {
   }
 
   return (
-    <section aria-labelledby="following-heading">
-      <SectionHeading id="following-heading">Authors you follow</SectionHeading>
+    <Panel title="Authors you follow">
       {error && <Notice kind="error">{error}</Notice>}
       {following.status === 'loading' && <Loading />}
       {following.status === 'error' && (
@@ -127,14 +118,14 @@ function MyFollowing() {
       )}
       {following.status === 'success' &&
         (following.data.length === 0 ? (
-          <p className="mt-4 text-muted">You do not follow anyone yet.</p>
+          <p className="p-4 text-muted">You do not follow anyone yet.</p>
         ) : (
           <ul className="divide-y divide-rule">
             {following.data.map(({ author }) => (
-              <li key={author.id} className="flex items-center justify-between gap-2 py-3">
+              <li key={author.id} className="flex items-center justify-between gap-2 px-4 py-3">
                 <Link
                   to={`/authors/${author.handle}`}
-                  className="font-medium hover:text-accent-strong"
+                  className="font-medium text-accent hover:underline"
                 >
                   {author.display_name}
                 </Link>
@@ -150,7 +141,7 @@ function MyFollowing() {
             ))}
           </ul>
         ))}
-    </section>
+    </Panel>
   )
 }
 
@@ -158,15 +149,14 @@ function MyArticles() {
   const [page, setPage] = useState(1)
   const articles = useAsync(`my-articles:${page}`, (signal) => listMyArticles(page, signal))
   return (
-    <section aria-labelledby="my-essays">
-      <SectionHeading id="my-essays">Your essays</SectionHeading>
+    <Panel title="Your essays">
       {articles.status === 'loading' && <Loading />}
       {articles.status === 'error' && (
         <ErrorState error={articles.error} onRetry={articles.reload} />
       )}
       {articles.status === 'success' &&
         (articles.data.items.length === 0 ? (
-          <div className="mt-4">
+          <div className="p-4">
             <Empty>
               You have not written anything yet.{' '}
               <Link to="/write" className="font-medium text-accent-strong underline">
@@ -180,11 +170,11 @@ function MyArticles() {
               {articles.data.items.map((article) => (
                 <li
                   key={article.id}
-                  className="flex flex-wrap items-baseline justify-between gap-2 py-3"
+                  className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3"
                 >
                   <Link
                     to={`/write/${article.id}`}
-                    className="font-medium hover:text-accent-strong"
+                    className="font-medium text-accent hover:underline"
                   >
                     {article.title}
                   </Link>
@@ -208,7 +198,7 @@ function MyArticles() {
             <Pagination page={page} pageSize={20} total={articles.data.total} onChange={setPage} />
           </>
         ))}
-    </section>
+    </Panel>
   )
 }
 
@@ -246,9 +236,8 @@ function ProfileForm({ user }: { user: Me }) {
   }
 
   return (
-    <section aria-labelledby="profile-heading">
-      <SectionHeading id="profile-heading">Profile</SectionHeading>
-      <form onSubmit={submit} className="mt-4 space-y-4" noValidate>
+    <Panel title="Profile">
+      <form onSubmit={submit} className="space-y-4 p-4" noValidate>
         {message && <Notice kind={message.kind}>{message.text}</Notice>}
         <TextField
           label="Display name"
@@ -283,7 +272,7 @@ function ProfileForm({ user }: { user: Me }) {
           {busy ? 'Saving…' : 'Save profile'}
         </button>
       </form>
-    </section>
+    </Panel>
   )
 }
 
@@ -310,15 +299,14 @@ function InterestsForm({ user }: { user: Me }) {
   }
 
   return (
-    <section aria-labelledby="interests-heading">
-      <SectionHeading id="interests-heading">Interests</SectionHeading>
-      <p className="mt-2 text-sm text-muted">
+    <Panel title="Interests">
+      <p className="px-4 pt-4 text-sm text-muted">
         Topics you would like to read about. Only you can see them.
       </p>
       {tags.status === 'loading' && <Loading />}
       {tags.status === 'error' && <ErrorState error={tags.error} onRetry={tags.reload} />}
       {tags.status === 'success' && (
-        <form onSubmit={submit} className="mt-4 space-y-4">
+        <form onSubmit={submit} className="space-y-4 p-4">
           {message && <Notice kind={message.kind}>{message.text}</Notice>}
           <fieldset className="flex flex-wrap gap-x-4 gap-y-2">
             <legend className="sr-only">Topics</legend>
@@ -345,6 +333,6 @@ function InterestsForm({ user }: { user: Me }) {
           </button>
         </form>
       )}
-    </section>
+    </Panel>
   )
 }

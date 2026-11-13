@@ -1,9 +1,10 @@
 import { Link, useSearchParams } from 'react-router'
 
 import { followingFeed } from '../api/social'
-import { ArticleCard } from '../components/ArticleCard'
 import { Pagination } from '../components/Pagination'
+import { PageTitle, Panel } from '../components/Panel'
 import { Empty, ErrorState, Loading } from '../components/States'
+import { TopicList } from '../components/TopicList'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
@@ -15,39 +16,45 @@ export function FollowingPage() {
   const feed = useAsync(`following:${page}`, (signal) => followingFeed(page, signal))
 
   return (
-    <div>
-      <h1 className="font-serif text-3xl font-semibold sm:text-4xl">Following</h1>
-      <p className="mt-2 text-muted">New essays by the authors you follow.</p>
-      {feed.status === 'loading' && <Loading label="Loading essays…" />}
-      {feed.status === 'error' && (
-        <div className="mt-6">
-          <ErrorState error={feed.error} onRetry={feed.reload} />
-        </div>
-      )}
-      {feed.status === 'success' &&
-        (feed.data.items.length === 0 ? (
-          <div className="mt-6">
-            <Empty>
-              Nothing here yet. Follow authors from their essays or profiles, or{' '}
-              <Link to="/" className="font-medium text-accent-strong underline">
-                browse all essays
-              </Link>
-              .
-            </Empty>
+    <div className="space-y-6">
+      <PageTitle lead="New essays by the authors you follow.">Following</PageTitle>
+      <Panel title="From the authors you follow">
+        {feed.status === 'loading' && (
+          <div className="px-4">
+            <Loading label="Loading essays…" />
           </div>
-        ) : (
-          <>
-            {feed.data.items.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
-            <Pagination
-              page={page}
-              pageSize={10}
-              total={feed.data.total}
-              onChange={(p) => setParams({ page: String(p) })}
-            />
-          </>
-        ))}
+        )}
+        {feed.status === 'error' && (
+          <div className="p-4">
+            <ErrorState error={feed.error} onRetry={feed.reload} />
+          </div>
+        )}
+        {feed.status === 'success' &&
+          (feed.data.items.length === 0 ? (
+            <div className="p-4">
+              <Empty>
+                Nothing here yet. Follow authors from their essays or profiles, or{' '}
+                <Link to="/" className="font-medium text-accent-strong underline">
+                  browse all essays
+                </Link>
+                .
+              </Empty>
+            </div>
+          ) : (
+            <>
+              <TopicList
+                label="Essays by the authors you follow"
+                topics={feed.data.items.map((article) => ({ article }))}
+              />
+              <Pagination
+                page={page}
+                pageSize={10}
+                total={feed.data.total}
+                onChange={(p) => setParams({ page: String(p) })}
+              />
+            </>
+          ))}
+      </Panel>
     </div>
   )
 }

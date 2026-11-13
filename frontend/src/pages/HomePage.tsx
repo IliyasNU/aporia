@@ -1,22 +1,30 @@
-import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { listArticles } from '../api/articles'
 import { listTags } from '../api/users'
-import { ArticleCard } from '../components/ArticleCard'
-import { primaryButton, secondaryButton } from '../components/buttons'
-import { Pagination } from '../components/Pagination'
-import { Empty, ErrorState, Loading } from '../components/States'
 import { useAuth } from '../auth/context'
+import { primaryButton } from '../components/buttons'
+import { Pagination } from '../components/Pagination'
+import { PageTitle } from '../components/Panel'
+import { Empty, ErrorState, Loading } from '../components/States'
+import { tagChip } from '../components/TagChips'
+import { TopicList } from '../components/TopicList'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { forumDescriptions, plural } from '../lib/forums'
 import { signInPath } from '../lib/redirect'
 
 const PAGE_SIZE = 10
+const SORTS = [
+  { value: 'latest', label: 'Latest' },
+  { value: 'popular', label: 'Most saved' },
+] as const
 
-/** FE-01: the public catalog with search, popular tags and pagination. */
+/**
+ * FE-01 in the Stack Exchange layout: the essay list with sort tabs, and a sidebar
+ * with the popular tags. ?q= (from the top bar), ?tag=, ?sort= and ?page= live in the URL.
+ */
 export function HomePage() {
-  useDocumentTitle(null)
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
@@ -28,9 +36,8 @@ export function HomePage() {
     listArticles({ q, tag, sort, page, pageSize: PAGE_SIZE }, signal),
   )
   const tags = useAsync('tags', listTags)
-
-  // Typing in the search box does not hit the API; submitting the form does.
-  const [draftQuery, setDraftQuery] = useState(q)
+  const tagName = (tags.status === 'success' && tags.data.find((t) => t.slug === tag)?.name) || tag
+  useDocumentTitle(q ? 'Search' : tag ? tagName : null)
 
   function update(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params)
@@ -42,11 +49,6 @@ export function HomePage() {
     setParams(next)
   }
 
-  function search(event: FormEvent) {
-    event.preventDefault()
-    update({ q: draftQuery.trim() || null })
-  }
-
   const popularTags =
     tags.status === 'success'
       ? tags.data
@@ -55,97 +57,64 @@ export function HomePage() {
       : []
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-serif text-3xl font-semibold sm:text-4xl">Essays</h1>
-        <Link to={user ? '/write' : signInPath('/write')} className={primaryButton}>
-          Write an essay
-        </Link>
-      </div>
+    <div className="flex flex-col gap-8 lg:flex-row lg:gap-6">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <PageTitle
+            lead={
+              q
+                ? `Essays matching “${q}”${tag ? ` and tagged ${tagName}` : ''}.`
+                : tag
+                  ? forumDescriptions[tag]
+                  : undefined
+            }
+          >
+            {q ? 'Search results' : tag ? `Essays tagged ${tagName}` : 'Essays'}
+          </PageTitle>
+          <Link to={user ? '/write' : signInPath('/write')} className={primaryButton}>
+            Write an essay
+          </Link>
+        </div>
 
-      <form role="search" onSubmit={search} className="mt-6 flex gap-2">
-        <label htmlFor="search" className="sr-only">
-          Search essays
-        </label>
-        <input
-          id="search"
-          type="search"
-          value={draftQuery}
-          onChange={(e) => setDraftQuery(e.target.value)}
-          maxLength={100}
-          placeholder="Search titles and summaries"
-          className="min-w-0 flex-1 rounded-md border border-rule bg-white px-3 py-2"
-        />
-        <button type="submit" className={secondaryButton}>
-          Search
-        </button>
-      </form>
-
-      <div className="mt-4 flex items-center gap-2 text-sm">
-        <label htmlFor="sort" className="text-muted">
-          Sort by
-        </label>
-        <select
-          id="sort"
-          value={sort}
-          onChange={(e) => update({ sort: e.target.value === 'popular' ? 'popular' : null })}
-          className="rounded-md border border-rule bg-white px-2 py-1"
-        >
-          <option value="latest">Latest</option>
-          <option value="popular">Most saved</option>
-        </select>
-      </div>
-
-      {popularTags.length > 0 && (
-        <section aria-labelledby="tags-heading" className="mt-6">
-          <h2 id="tags-heading" className="sr-only">
-            Popular tags
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {popularTags.map((t) => {
-              const active = t.slug === tag
+        <div className="mt-4 mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[17px]">
+            {articles.status === 'success' && plural(articles.data.total, 'essay', 'essays')}
+          </p>
+          <div role="group" aria-label="Sort by" className="flex">
+            {SORTS.map((option, index) => {
+              const active = option.value === sort
               return (
-                <li key={t.slug}>
-                  <button
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => update({ tag: active ? null : t.slug })}
-                    className={`rounded-full border px-3 py-1 text-sm ${
-                      active
-                        ? 'border-accent bg-accent text-white'
-                        : 'border-rule text-muted hover:border-accent hover:text-accent-strong'
-                    }`}
-                  >
-                    {t.name} <span className="opacity-70">{t.article_count}</span>
-                  </button>
-                </li>
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-current={active ? 'true' : undefined}
+                  onClick={() => update({ sort: option.value === 'popular' ? 'popular' : null })}
+                  className={`border border-[#9fa6ad] px-2.5 py-[7px] text-xs leading-none ${
+                    index === 0 ? 'rounded-l-[6px]' : '-ml-px rounded-r-[6px]'
+                  } ${active ? 'bg-[#e3e6e8] text-ink' : 'bg-white text-muted hover:bg-row'}`}
+                >
+                  {option.label}
+                </button>
               )
             })}
-          </ul>
-        </section>
-      )}
-
-      <section aria-label="Articles" className="mt-4">
-        {articles.status === 'loading' && <Loading label="Loading essays…" />}
-        {articles.status === 'error' && (
-          <div className="mt-6">
-            <ErrorState error={articles.error} onRetry={articles.reload} />
           </div>
-        )}
-        {articles.status === 'success' &&
-          (articles.data.items.length === 0 ? (
-            <div className="mt-6">
+        </div>
+
+        <section aria-label="Articles">
+          {articles.status === 'loading' && <Loading label="Loading essays…" />}
+          {articles.status === 'error' && (
+            <ErrorState error={articles.error} onRetry={articles.reload} />
+          )}
+          {articles.status === 'success' &&
+            (articles.data.items.length === 0 ? (
               <Empty>
                 {q || tag ? (
                   <>
                     No essays match these filters.{' '}
                     <button
                       type="button"
-                      className="font-medium text-accent-strong underline"
-                      onClick={() => {
-                        setDraftQuery('')
-                        setParams(new URLSearchParams())
-                      }}
+                      className="text-accent hover:text-button"
+                      onClick={() => setParams(new URLSearchParams())}
                     >
                       Clear filters
                     </button>
@@ -154,21 +123,72 @@ export function HomePage() {
                   'No essays have been published yet.'
                 )}
               </Empty>
-            </div>
-          ) : (
-            <>
-              {articles.data.items.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-              <Pagination
-                page={page}
-                pageSize={PAGE_SIZE}
-                total={articles.data.total}
-                onChange={(p) => update({ page: String(p) })}
-              />
-            </>
-          ))}
-      </section>
+            ) : (
+              <>
+                <TopicList
+                  label="Essays"
+                  topics={articles.data.items.map((article) => ({ article }))}
+                />
+                <Pagination
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  total={articles.data.total}
+                  onChange={(p) => update({ page: String(p) })}
+                />
+              </>
+            ))}
+        </section>
+      </div>
+
+      <aside aria-label="Sidebar" className="w-full shrink-0 space-y-4 lg:w-[300px]">
+        <section
+          aria-labelledby="welcome-heading"
+          className="rounded-[5px] border border-note-rule bg-note text-[#3b4045]"
+        >
+          <h2
+            id="welcome-heading"
+            className="border-b border-note-rule bg-[#fbf3d5] px-4 py-3 text-xs font-bold text-[#525960]"
+          >
+            Welcome to Aporia
+          </h2>
+          <ul className="space-y-2 px-4 py-3">
+            <li>Long-form philosophy, written in Markdown and discussed in the comments.</li>
+            <li>Save essays, follow authors, or get their new essays by email.</li>
+            <li>
+              Please read the{' '}
+              <Link to="/rules" className="text-accent hover:text-button">
+                publication rules
+              </Link>{' '}
+              before you write.
+            </li>
+          </ul>
+        </section>
+
+        {popularTags.length > 0 && (
+          <section aria-labelledby="tags-heading">
+            <h2 id="tags-heading" className="mb-3 text-[19px]">
+              Popular tags
+            </h2>
+            <ul className="flex flex-wrap gap-x-1 gap-y-2">
+              {popularTags.map((t) => {
+                const active = t.slug === tag
+                return (
+                  <li key={t.slug}>
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => update({ tag: active ? null : t.slug })}
+                      className={`${tagChip} ${active ? 'ring-2 ring-tag-ink' : ''}`}
+                    >
+                      {t.name} <span className="text-muted">× {t.article_count}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+      </aside>
     </div>
   )
 }

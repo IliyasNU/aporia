@@ -31,6 +31,10 @@ export type ArticleListItem = {
   tags: Tag[]
   published_at: string | null
   updated_at: string
+  // Visible replies, saves, and when the newest visible reply was written.
+  comment_count: number
+  bookmark_count: number
+  last_comment_at: string | null
 }
 
 export type Article = ArticleListItem & {

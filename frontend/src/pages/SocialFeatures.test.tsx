@@ -193,7 +193,8 @@ describe('Feeds', () => {
     })
     renderApp('/')
 
-    await userEvent.selectOptions(await screen.findByLabelText('Sort by'), 'popular')
+    const sortTabs = await screen.findByRole('group', { name: 'Sort by' })
+    await userEvent.click(within(sortTabs).getByRole('button', { name: 'Most saved' }))
 
     await waitFor(() =>
       expect(calls.map((c) => c.path)).toContain('/articles?sort=popular&page=1&page_size=10'),
