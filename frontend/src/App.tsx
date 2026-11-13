@@ -9,6 +9,7 @@ import { ArticlePage } from './pages/ArticlePage'
 import { AuthorPage } from './pages/AuthorPage'
 import { EditorPage } from './pages/EditorPage'
 import { FollowingPage } from './pages/FollowingPage'
+import { ForYouPage } from './pages/ForYouPage'
 import { HomePage } from './pages/HomePage'
 import { ConfirmSubscriptionPage, UnsubscribePage } from './pages/NewsletterPages'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -32,6 +33,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/for-you" element={<ForYouPage />} />
           <Route path="/articles/:slug" element={<ArticlePage />} />
           <Route path="/authors/:handle" element={<AuthorPage />} />
           <Route path="/signin" element={<SignInPage />} />

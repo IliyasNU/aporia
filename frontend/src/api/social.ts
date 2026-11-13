@@ -1,6 +1,6 @@
 import { queryString } from './articles'
 import { api } from './client'
-import type { ArticleListItem, Comment, FollowedAuthor, Page } from './types'
+import type { ArticleListItem, Comment, FollowedAuthor, Page, RecommendationPage } from './types'
 
 export const follow = (authorId: string) =>
   api<void>(`/authors/${authorId}/follow`, { method: 'POST' })
@@ -43,4 +43,9 @@ export const report = (targetType: ReportTarget, targetId: string, reason: strin
   api<void>('/reports', {
     method: 'POST',
     body: { target_type: targetType, target_id: targetId, reason },
+  })
+
+export const recommendedFeed = (page: number, signal?: AbortSignal) =>
+  api<RecommendationPage>(`/feed/recommended${queryString({ page, page_size: 10 })}`, {
+    signal,
   })
