@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.core.errors import AppError
 from app.models import Article, ArticleStatus, Bookmark, ModerationStatus, Tag, User
 from app.schemas.articles import ArticleCreate, ArticleUpdate
+from app.services.newsletter import queue_new_article_emails
 from app.services.tags import resolve_tags
 from app.services.visibility import publicly_visible
 
@@ -126,6 +127,10 @@ def publish_article(db: Session, article: Article) -> bool:
     article.status = ArticleStatus.PUBLISHED
     if first_publication:
         article.published_at = datetime.now(UTC)
+        # Same transaction as the publication: no publication without its emails
+        # and no emails without the publication. Sending happens later, in the
+        # worker, so an SMTP outage can never block publishing.
+        queue_new_article_emails(db, article)
     _commit(db)
     return first_publication
 

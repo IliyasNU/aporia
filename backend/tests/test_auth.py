@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import SESSION_COOKIE, set_session_cookie
 from app.core.config import Settings
-from app.core.security import hash_session_token
+from app.core.security import hash_token
 from app.models import User, UserSession
 from tests.conftest import DEFAULT_PASSWORD, register
 
@@ -186,7 +186,7 @@ def test_login_replaces_previous_session_of_the_same_browser(
 
     assert client.cookies[SESSION_COOKIE] != first_token
     first = db_session.scalar(
-        select(UserSession).where(UserSession.token_hash == hash_session_token(first_token))
+        select(UserSession).where(UserSession.token_hash == hash_token(first_token))
     )
     assert first is not None
     assert first.revoked_at is not None
@@ -202,7 +202,7 @@ def test_registering_while_signed_in_ends_the_previous_session(
 
     assert client.get(ME).json()["handle"] == "second"
     first = db_session.scalar(
-        select(UserSession).where(UserSession.token_hash == hash_session_token(first_token))
+        select(UserSession).where(UserSession.token_hash == hash_token(first_token))
     )
     assert first is not None
     assert first.revoked_at is not None
@@ -227,7 +227,7 @@ def test_session_token_is_stored_only_as_hash(client: TestClient, db_session: Se
 
     stored = db_session.scalar(select(UserSession.token_hash))
 
-    assert stored == hash_session_token(token)
+    assert stored == hash_token(token)
     assert stored != token
 
 
@@ -295,7 +295,7 @@ def test_logout_without_session_is_harmless(client: TestClient) -> None:
 def test_session_cookie_is_secure_only_in_production() -> None:
     production, development = Response(), Response()
 
-    set_session_cookie(production, "token", Settings(app_env="production"))
+    set_session_cookie(production, "token", Settings(app_env="production", secret_key="x" * 48))
     set_session_cookie(development, "token", Settings(app_env="development"))
 
     assert "Secure" in production.headers["set-cookie"]
@@ -324,3 +324,12 @@ def test_auth_flow_never_logs_passwords_tokens_or_emails(
     assert caplog.records, "expected at least one log record"
     for secret in (DEFAULT_PASSWORD, token, "private@example.com"):
         assert secret not in caplog.text
+
+
+def test_production_refuses_the_development_secret_key() -> None:
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+        Settings(app_env="production")
+    with pytest.raises(ValueError, match="SECRET_KEY"):
+        Settings(app_env="production", secret_key="")
+
+    assert Settings(app_env="production", secret_key="a-real-random-value-" * 3)

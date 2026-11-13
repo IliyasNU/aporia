@@ -1,6 +1,12 @@
 """All ORM models, imported here so Alembic sees the complete metadata."""
 
 from app.models.article import Article, ArticleStatus, article_tags
+from app.models.newsletter import (
+    EmailJob,
+    EmailJobStatus,
+    EmailSubscription,
+    SubscriptionStatus,
+)
 from app.models.social import (
     Bookmark,
     Comment,
@@ -18,11 +24,15 @@ __all__ = [
     "ArticleStatus",
     "Bookmark",
     "Comment",
+    "EmailJob",
+    "EmailJobStatus",
+    "EmailSubscription",
     "Follow",
     "ModerationStatus",
     "Report",
     "ReportStatus",
     "ReportTarget",
+    "SubscriptionStatus",
     "Tag",
     "User",
     "UserRole",

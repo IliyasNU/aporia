@@ -1,13 +1,13 @@
 # Architecture
 
 Aporia is deliberately simple: one FastAPI service, one PostgreSQL database, one React
-SPA and, from Stage 5, one email worker process. No microservices, message brokers,
+SPA and one email worker process. No microservices, message brokers,
 Kubernetes or paid AI APIs.
 
 ```
-browser ──► web (nginx) ──/api──► api (FastAPI) ──► db (PostgreSQL 16)
-               │                                      ▲
-               └── static SPA files                   │
+browser ──► web (nginx) ──/api──► api (FastAPI) ──► db (PostgreSQL 16) ◄── worker ──► SMTP
+               │                                      ▲                            (Mailpit
+               └── static SPA files                   │                             locally)
                                     migrate (Alembic, runs once at startup)
 ```
 
@@ -149,3 +149,26 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   reports. Admins are assigned with `python -m app.cli set-role`, never through the API.
 - **Popularity** (`sort=popular`) counts bookmarks with a correlated subquery; ties fall
   back to newest first.
+
+## Email subscriptions (Stage 5)
+
+- **Independent of accounts:** a subscription is (author, normalized email). Anyone can
+  subscribe; an account is not needed and not linked.
+- **Double opt-in:** nothing but the confirmation email is ever sent to a pending address.
+  `request_subscription` answers identically in every case, and a pending address gets at
+  most one confirmation email per `NEWSLETTER_RESEND_MINUTES`.
+- **Tokens:** confirmation tokens are random (`secrets.token_urlsafe`), expire, and only
+  their SHA-256 hash is stored. The unsubscribe token must work in every future email, so
+  it is `HMAC(SECRET_KEY, subscription id)`: the worker recomputes it per email, the
+  database stores only its hash, and nobody without the key can forge one. Rotating
+  `SECRET_KEY` therefore invalidates old unsubscribe links.
+- **Links** put tokens after `#` (never sent to servers, so never in logs), and the pages
+  act only on a button press (a `POST`), so mail scanners that open links change nothing.
+- **Outbox pattern:** publishing writes `email_jobs` rows in the same transaction; SMTP
+  only happens in the worker. A broken mail server can never block or undo a publication.
+- **Worker:** `SELECT … FOR UPDATE SKIP LOCKED` picks one due job at a time, so several
+  worker processes would not send the same job twice. Retries back off 1 → 5 → 25 → 125
+  minutes (capped at 6 hours) up to `WORKER_MAX_ATTEMPTS`; 5xx answers fail at once.
+  Before sending it re-checks that the subscription is confirmed and the essay public.
+- **Header injection:** subjects are built from user content (titles), so newlines are
+  collapsed before they become headers.

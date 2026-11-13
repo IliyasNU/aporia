@@ -10,7 +10,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | **In review** |
 | 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | **In review** |
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | **In review** |
-| 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | Not started   |
+| 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | **In review** |
 | 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | Not started   |
 | 7     | Release: security hardening, Docker smoke, docs, demo         | SEC-01 … SEC-07           | Not started   |
 
@@ -79,3 +79,16 @@ Screens (React Router, all wired to the real API):
   `POST /admin/moderate` (admins only), `python -m app.cli set-role` to assign admins.
 - UI: Save / Follow buttons, comments with edit, delete and report, report an essay,
   "Most saved" sort, `/following` feed, saved essays and followed authors in the account.
+
+## Stage 5: what exists
+
+- Migration `0005`: `email_subscriptions` (unique per author and normalized email, hashed
+  tokens) and `email_jobs` (unique per article and subscription, status, attempts,
+  next_retry_at, sent_at, error_code).
+- `POST /authors/{id}/newsletter-subscriptions`, `POST /newsletter/confirm`,
+  `POST /newsletter/unsubscribe`.
+- Jobs are created in the transaction of the first publication; `python -m app.worker`
+  sends them with retries, cancellation and cleanup. `worker` and `mailpit` services in
+  Docker Compose.
+- UI: subscribe form on author pages, `/newsletter/confirm` and `/newsletter/unsubscribe`
+  pages that act only on a button press.
