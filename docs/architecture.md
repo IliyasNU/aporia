@@ -219,8 +219,9 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
 - **No SMTP account, no pretending.** Without `SMTP_HOST`, `start.sh` sets
   `EMAIL_ENABLED=false`: subscribing answers `503 email_unavailable` and the worker leaves
   queued emails alone, instead of promising emails that would never arrive.
-- **Client IP.** Render's proxy appends to `X-Forwarded-For`, so nginx's `real_ip` takes
-  the last entry (`REAL_IP_HEADER`), and uvicorn trusts nginx on localhost (its default).
+- **Client IP.** nginx's `real_ip` reads the header named by `REAL_IP_HEADER`: on Render
+  `CF-Connecting-IP`, set by Cloudflare in front of it (a live test showed
+  `X-Forwarded-For` could be spoofed there). uvicorn trusts nginx on localhost (its default).
 - **Admin without a shell.** `ADMIN_EMAIL` gives that existing account the admin role on
   every start, because the free plan offers no shell for `python -m app.cli set-role`.
 - **512 MB of memory.** Argon2id needs 64 MiB per hash, so at most two hashes or checks
