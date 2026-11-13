@@ -26,9 +26,10 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      # Render's proxy appends to X-Forwarded-For; see docs/deployment.md.
+      # Cloudflare, in front of Render, sets this to the visitor's address and replaces
+      # any value a visitor sends; X-Forwarded-For is not usable here (docs/deployment.md).
       - key: REAL_IP_HEADER
-        value: X-Forwarded-For
+        value: CF-Connecting-IP
       # Email is optional: without SMTP_HOST the site works and subscribing is off.
       # The free plan blocks ports 25, 465 and 587, so use your provider's port 2525.
       - key: SMTP_HOST

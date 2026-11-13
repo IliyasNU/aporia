@@ -68,12 +68,16 @@ From [Render's documentation](https://render.com/docs/free):
 
 ### Visitor addresses and rate limits
 
-Rate limits count requests per visitor address. Render's proxy _appends_ the address it
-sees to `X-Forwarded-For` and keeps whatever the visitor sent before it, so only the last
-entry can be trusted. The image's nginx uses exactly that entry
-(`REAL_IP_HEADER=X-Forwarded-For` and `real_ip_header` in `deploy/nginx.conf`); CI checks
-it. On another host, set `REAL_IP_HEADER` to the header its load balancer sets, such as
-`Fly-Client-IP` on Fly.io.
+Rate limits count requests per visitor address, so the container must learn the real one.
+On Render that is **`CF-Connecting-IP`** (`REAL_IP_HEADER` in `render.yaml`): Render's
+`onrender.com` addresses sit behind Cloudflare, which sets that header to the visitor's
+address and replaces any value a visitor sends. `X-Forwarded-For` does not work there:
+tested on the live service, a spoofed value went through, and without one the last entry
+is a changing proxy address, so the per-address limits never added up.
+
+Elsewhere, set `REAL_IP_HEADER` to the header your load balancer sets (for example
+`Fly-Client-IP` on Fly.io). The default, `X-Forwarded-For`, takes the last entry, which is
+right for a proxy that appends the address it sees; CI checks that rule.
 
 ### Moving the database
 
