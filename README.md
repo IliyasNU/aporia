@@ -4,10 +4,10 @@ A publishing platform for philosophical essays: authors publish, readers follow 
 subscribe to email updates and get transparent, explainable recommendations.
 Built with FastAPI, React and PostgreSQL.
 
-> **Status: Stage 2 (Publishing), API only.** Accounts, profiles, interests, articles
-> (drafts, publishing, editing, soft delete), the tag catalog and search work through the
-> API. Follows, bookmarks, comments, email subscriptions, recommendations and the web UI for
-> these features are **not implemented yet**. See [docs/roadmap.md](docs/roadmap.md).
+> **Status: Stage 3 (Frontend).** Sign up, sign in, profiles, interests, writing with a
+> Markdown preview, publishing, search and tag filters work in the browser. Follows,
+> bookmarks, comments, email subscriptions and recommendations are **not implemented yet**.
+> See [docs/roadmap.md](docs/roadmap.md).
 
 ## Quick start (Docker)
 
@@ -137,28 +137,34 @@ npm run build
 What is checked automatically on every push and pull request
 ([.github/workflows/ci.yml](.github/workflows/ci.yml)) and what has only been checked by hand.
 
-| Check                                                                        | How       |
-| ---------------------------------------------------------------------------- | --------- |
-| Backend lint and formatting (ruff)                                           | Automatic |
-| Backend tests against PostgreSQL 16: health, error format, migrations        | Automatic |
-| Auth: Argon2id hashes, sessions, logout, expired/tampered/replayed cookies   | Automatic |
-| Auth: same answer for unknown email and wrong password                       | Automatic |
-| CSRF: untrusted Origin/Referer rejected, trusted and non-browser allowed     | Automatic |
-| Profiles: input limits, own profile only, public view hides email            | Automatic |
-| Articles: drafts private, publish/unpublish/delete, only owner can change    | Automatic |
-| Articles: slug stays the same after first publish, empty body cannot publish | Automatic |
-| Catalog: search (case, Unicode, wildcards), filters, pagination, 422s        | Automatic |
-| Catalog: drafts/unpublished/deleted never listed; no N+1 queries             | Automatic |
-| No passwords, session tokens or emails in application logs                   | Automatic |
-| Migrations apply to an empty database, downgrade and re-apply                | Automatic |
-| ORM models match migrations (`alembic check`)                                | Automatic |
-| Frontend lint, formatting, typecheck, unit tests, production build           | Automatic |
-| `docker compose up` from scratch: images build, API and web healthy          | Automatic |
-| Page layout at 360 px and 1280 px, no horizontal scroll                      | Manual    |
-| API returns 503 and the page shows it when the database is stopped           | Manual    |
-| Data survives `docker compose down` / `up`                                   | Manual    |
-| Full auth flow in Chromium through nginx; cookie unreadable from JS          | Manual    |
-| Cross-site form POST from another origin is blocked in Chromium              | Manual    |
+| Check                                                                              | How       |
+| ---------------------------------------------------------------------------------- | --------- |
+| Backend lint and formatting (ruff)                                                 | Automatic |
+| Backend tests against PostgreSQL 16: health, error format, migrations              | Automatic |
+| Auth: Argon2id hashes, sessions, logout, expired/tampered/replayed cookies         | Automatic |
+| Auth: same answer for unknown email and wrong password                             | Automatic |
+| CSRF: untrusted Origin/Referer rejected, trusted and non-browser allowed           | Automatic |
+| Profiles: input limits, own profile only, public view hides email                  | Automatic |
+| Articles: drafts private, publish/unpublish/delete, only owner can change          | Automatic |
+| Articles: slug stays the same after first publish, empty body cannot publish       | Automatic |
+| Catalog: search (case, Unicode, wildcards), filters, pagination, 422s              | Automatic |
+| Catalog: drafts/unpublished/deleted never listed; no N+1 queries                   | Automatic |
+| Frontend: pages render API data, loading/empty/error states, retry                 | Automatic |
+| Frontend: Markdown drops HTML, strips javascript: links, no remote images          | Automatic |
+| Frontend: forms keep input on server errors; delete needs confirmation             | Automatic |
+| Frontend: sign-in redirects only to same-site paths                                | Automatic |
+| No passwords, session tokens or emails in application logs                         | Automatic |
+| Migrations apply to an empty database, downgrade and re-apply                      | Automatic |
+| ORM models match migrations (`alembic check`)                                      | Automatic |
+| Frontend lint, formatting, typecheck, unit tests, production build                 | Automatic |
+| `docker compose up` from scratch: images build, API and web healthy                | Automatic |
+| Page layout at 360 px and 1280 px, no horizontal scroll                            | Manual    |
+| API returns 503 and the page shows it when the database is stopped                 | Manual    |
+| Data survives `docker compose down` / `up`                                         | Manual    |
+| Full auth flow in Chromium through nginx; cookie unreadable from JS                | Manual    |
+| Cross-site form POST from another origin is blocked in Chromium                    | Manual    |
+| Full UI flow in Chromium at 360 px: sign up → write → publish → unpublish → delete | Manual    |
+| Keyboard: skip link first, visible focus; no horizontal scroll at 360 px           | Manual    |
 
 ## Project structure
 
@@ -171,6 +177,10 @@ backend/        FastAPI app, Alembic migrations, pytest suite
   app/schemas/  Pydantic request/response models
   app/services/ business logic (auth, users, articles, tags) called by the routers
 frontend/       React + TypeScript + Vite + Tailwind SPA
+  src/api/      typed fetch functions, one per endpoint
+  src/auth/     who is signed in (AuthProvider, useAuth)
+  src/pages/    one component per screen (FE-01..FE-05)
+  src/components/ shared UI: layout, cards, forms, Markdown, states
 docs/           architecture notes and roadmap
 docker-compose.yml
 ```
