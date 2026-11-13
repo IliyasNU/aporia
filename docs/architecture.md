@@ -98,8 +98,8 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   republishing.
 - **Soft delete** sets `deleted_at`. The row stays (comments, bookmarks and email jobs can
   still reference it), but nobody, including the author, can open it again.
-- **Visibility** is defined once in `app/services/visibility.py`: published and not
-  deleted (Stage 4 adds "not hidden by a moderator"). Every public list, the search, tag
+- **Visibility** is defined once in `app/services/visibility.py`: published, not deleted
+  and not hidden by a moderator. Every public list, the search, tag
   counts and later the feeds and recommendations use it.
 - **Markdown** is stored and returned as raw text. The API never renders HTML; the frontend
   renders Markdown with raw HTML disabled (SEC-02).
@@ -131,3 +131,21 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   `role="status"`/`role="alert"` for async messages, visible focus outlines.
 - **SEO:** each page sets `<title>`, the meta description and Open Graph title/description.
   Server-side rendering and a sitemap are optional per the spec and not included.
+
+## Social features and moderation (Stage 4)
+
+- **Unique pairs in the database:** `follows (follower_id, author_id)` and
+  `bookmarks (user_id, article_id)` use the pair as primary key, so duplicates are
+  impossible. The API inserts with `ON CONFLICT DO NOTHING`, which makes following or
+  saving twice (even at the same moment) harmless. A `CHECK` constraint forbids following
+  yourself.
+- **Comments** are plain text (never Markdown or HTML), flat, at most 2000 characters,
+  soft-deleted, and only shown while their article is public.
+- **Reports** point at an article or comment (`target_type` + `target_id`, no foreign key
+  because the target table varies; the service checks the target exists and is public).
+  One report per user and target.
+- **Moderation:** `moderation_status` (`visible` / `hidden`) on articles and comments.
+  Only users with `role = 'admin'` may call `/admin/*`. Hiding closes the target's open
+  reports. Admins are assigned with `python -m app.cli set-role`, never through the API.
+- **Popularity** (`sort=popular`) counts bookmarks with a correlated subquery; ties fall
+  back to newest first.

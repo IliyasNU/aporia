@@ -11,6 +11,8 @@ export type Author = AuthorBrief & {
   created_at: string
 }
 
+export type AuthorProfile = Author & { followed_by_me: boolean }
+
 export type Me = Author & {
   email: string
   role: 'user' | 'admin'
@@ -34,7 +36,21 @@ export type ArticleListItem = {
 export type Article = ArticleListItem & {
   body_markdown: string
   created_at: string
+  moderation_status: 'visible' | 'hidden'
 }
+
+export type ArticleDetail = Article & { bookmarked_by_me: boolean; following_author: boolean }
+
+export type Comment = {
+  id: string
+  article_id: string
+  author: AuthorBrief
+  text: string
+  created_at: string
+  updated_at: string
+}
+
+export type FollowedAuthor = { author: AuthorBrief; created_at: string }
 
 export type Page<T> = {
   items: T[]

@@ -11,12 +11,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.errors import AppError
-from app.models import Article, ArticleStatus, Tag, User
+from app.models import Article, ArticleStatus, Bookmark, ModerationStatus, Tag, User
 from app.schemas.articles import ArticleCreate, ArticleUpdate
 from app.services.tags import resolve_tags
 from app.services.visibility import publicly_visible
 
-ArticleSort = Literal["latest"]
+ArticleSort = Literal["latest", "popular"]
 
 # --- Slugs ------------------------------------------------------------------
 
@@ -66,7 +66,7 @@ def get_own_article(db: Session, article_id: uuid.UUID, user: User) -> Article:
 
 
 def get_article_by_slug(db: Session, slug: str, viewer: User | None) -> Article:
-    """Published articles for everyone; drafts and unpublished ones only for their author.
+    """Published articles for everyone; drafts, unpublished and hidden ones only for their author.
 
     Anyone else gets 404, so the existence of a draft is not revealed.
     """
@@ -76,7 +76,11 @@ def get_article_by_slug(db: Session, slug: str, viewer: User | None) -> Article:
     if article is None:
         raise AppError(404, "not_found", "Article not found")
     is_author = viewer is not None and viewer.id == article.author_id
-    if article.status != ArticleStatus.PUBLISHED and not is_author:
+    is_public = (
+        article.status == ArticleStatus.PUBLISHED
+        and article.moderation_status == ModerationStatus.VISIBLE
+    )
+    if not is_public and not is_author:
         raise AppError(404, "not_found", "Article not found")
     return article
 
@@ -146,7 +150,7 @@ def _escape_like(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _paginate(
+def paginate(
     db: Session, query: Select[tuple[Article]], page: int, page_size: int
 ) -> tuple[list[Article], int]:
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
@@ -177,9 +181,18 @@ def list_public_articles(
         query = query.where(Article.tags.any(Tag.slug == tag.strip().lower()))
     if author:
         query = query.join(Article.author).where(User.handle == author.strip().lower())
-    # "latest": newest first; the id makes the order stable for equal timestamps.
+    if sort == "popular":
+        # Most bookmarked first; ties fall back to the newest.
+        bookmarks = (
+            select(func.count())
+            .where(Bookmark.article_id == Article.id)
+            .correlate(Article)
+            .scalar_subquery()
+        )
+        query = query.order_by(bookmarks.desc())
+    # The id makes the order stable for equal timestamps.
     query = query.order_by(Article.published_at.desc(), Article.id.desc())
-    return _paginate(db, query, page, page_size)
+    return paginate(db, query, page, page_size)
 
 
 def list_own_articles(
@@ -190,4 +203,4 @@ def list_own_articles(
         .where(Article.author_id == user.id, Article.deleted_at.is_(None))
         .order_by(Article.updated_at.desc(), Article.id.desc())
     )
-    return _paginate(db, query, page, page_size)
+    return paginate(db, query, page, page_size)

@@ -68,6 +68,12 @@ class AuthorOut(BaseModel):
     created_at: datetime
 
 
+class AuthorProfile(AuthorOut):
+    """Public profile plus whether the current visitor follows this author."""
+
+    followed_by_me: bool = False
+
+
 class MeOut(AuthorOut):
     """The signed-in user's own account."""
 

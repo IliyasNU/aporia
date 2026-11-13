@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 
-import type { Article, ArticleListItem, Me, Page, TagWithCount } from '../api/types'
+import type { ArticleDetail, ArticleListItem, Comment, Me, Page, TagWithCount } from '../api/types'
 import App from '../App'
 
 export type Reply = { status: number; body?: unknown }
@@ -65,7 +65,7 @@ export function makeMe(overrides: Partial<Me> = {}): Me {
   }
 }
 
-export function makeArticle(overrides: Partial<Article> = {}): Article {
+export function makeArticle(overrides: Partial<ArticleDetail> = {}): ArticleDetail {
   return {
     id: 'article-1',
     slug: 'on-doubt',
@@ -78,6 +78,9 @@ export function makeArticle(overrides: Partial<Article> = {}): Article {
     updated_at: '2026-03-01T10:00:00Z',
     created_at: '2026-03-01T09:00:00Z',
     body_markdown: 'I know that I know nothing.',
+    moderation_status: 'visible',
+    bookmarked_by_me: false,
+    following_author: false,
     ...overrides,
   }
 }
@@ -91,3 +94,15 @@ export const tagCatalog: TagWithCount[] = [
   { slug: 'ethics', name: 'Ethics', article_count: 0 },
   { slug: 'logic', name: 'Logic', article_count: 5 },
 ]
+
+export function makeComment(overrides: Partial<Comment> = {}): Comment {
+  return {
+    id: 'comment-1',
+    article_id: 'article-1',
+    author: { id: 'user-2', handle: 'plato', display_name: 'Plato' },
+    text: 'Well argued.',
+    created_at: '2026-03-02T10:00:00Z',
+    updated_at: '2026-03-02T10:00:00Z',
+    ...overrides,
+  }
+}

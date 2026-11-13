@@ -8,6 +8,7 @@ import { AccountPage } from './pages/AccountPage'
 import { ArticlePage } from './pages/ArticlePage'
 import { AuthorPage } from './pages/AuthorPage'
 import { EditorPage } from './pages/EditorPage'
+import { FollowingPage } from './pages/FollowingPage'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { SignInPage } from './pages/SignInPage'
@@ -47,6 +48,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <EditorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/following"
+            element={
+              <RequireAuth>
+                <FollowingPage />
               </RequireAuth>
             }
           />

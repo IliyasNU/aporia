@@ -9,7 +9,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | 1     | Accounts: register/login/logout, sessions, profile, interests | AUTH-01, AUTH-02, USER-01 | **In review** |
 | 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | **In review** |
 | 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | **In review** |
-| 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | Not started   |
+| 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | **In review** |
 | 5     | Email: double opt-in, unsubscribe, DB-backed jobs, worker     | MAIL-01 … MAIL-04, FE-07  | Not started   |
 | 6     | Recommendations: heuristic ranker, cold start, reasons        | REC-01 … REC-03, FE-06    | Not started   |
 | 7     | Release: security hardening, Docker smoke, docs, demo         | SEC-01 … SEC-07           | Not started   |
@@ -46,8 +46,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 - Additions needed by the frontend: `GET /me/articles`, `GET /me/articles/{id}` (editor)
   and `GET /tags` (catalog with counts, for popular tags and pickers).
 - One visibility rule (`app/services/visibility.py`) used by every public query.
-- Not yet: `sort=popular` needs bookmarks and arrives with Stage 4; until then `sort`
-  accepts only `latest`.
+- `sort=popular` (most bookmarked first) was added in Stage 4.
 
 ## Stage 3: what exists
 
@@ -64,3 +63,19 @@ Screens (React Router, all wired to the real API):
 
 - Loading, empty and error states (with retry) on every data view; checked at 360 px.
 - Follow, bookmark and comment controls arrive with Stage 4; the newsletter form with Stage 5.
+
+## Stage 4: what exists
+
+- Migration `0004`: `follows`, `bookmarks` (composite primary keys = unique pairs),
+  `comments`, `reports`, and `articles.moderation_status`.
+- Follows: `POST/DELETE /authors/{id}/follow` (idempotent, not yourself),
+  `GET /me/following`, `GET /feed/following`; `followed_by_me` on author profiles.
+- Bookmarks: `POST/DELETE /articles/{id}/bookmark` (idempotent, public articles only),
+  `GET /me/bookmarks`; `bookmarked_by_me` and `following_author` on article details;
+  `GET /articles?sort=popular`.
+- Comments: `GET/POST /articles/{id}/comments`, `PATCH/DELETE /comments/{id}` (own only,
+  plain text up to 2000 characters, soft delete).
+- Moderation: `POST /reports` (one per user and target), `GET /admin/reports`,
+  `POST /admin/moderate` (admins only), `python -m app.cli set-role` to assign admins.
+- UI: Save / Follow buttons, comments with edit, delete and report, report an essay,
+  "Most saved" sort, `/following` feed, saved essays and followed authors in the account.

@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Author, Me, Tag, TagWithCount } from './types'
+import type { AuthorProfile, Me, Tag, TagWithCount } from './types'
 
 export type ProfileChanges = {
   display_name?: string
@@ -8,7 +8,7 @@ export type ProfileChanges = {
 }
 
 export const getAuthor = (handle: string, signal?: AbortSignal) =>
-  api<Author>(`/authors/${encodeURIComponent(handle)}`, { signal })
+  api<AuthorProfile>(`/authors/${encodeURIComponent(handle)}`, { signal })
 
 export const updateProfile = (changes: ProfileChanges) =>
   api<Me>('/me/profile', { method: 'PATCH', body: changes })

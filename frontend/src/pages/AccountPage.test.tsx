@@ -29,6 +29,8 @@ describe('AccountPage', () => {
       'GET /auth/me': { status: 200, body: makeMe() },
       'GET /tags': { status: 200, body: tagCatalog },
       'GET /me/articles': { status: 200, body: page([]) },
+      'GET /me/bookmarks': { status: 200, body: page([]) },
+      'GET /me/following': { status: 200, body: [] },
       'PATCH /me/profile': (body) => ({ status: 200, body: makeMe(body as object) }),
       'PUT /me/interests': {
         status: 200,
@@ -59,6 +61,8 @@ describe('AccountPage', () => {
       'GET /auth/me': { status: 200, body: makeMe() },
       'GET /tags': { status: 200, body: tagCatalog },
       'GET /me/articles': { status: 200, body: page([]) },
+      'GET /me/bookmarks': { status: 200, body: page([]) },
+      'GET /me/following': { status: 200, body: [] },
       'POST /auth/logout': { status: 204 },
       'GET /articles': { status: 200, body: page([]) },
     })

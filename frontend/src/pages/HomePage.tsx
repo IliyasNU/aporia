@@ -21,10 +21,11 @@ export function HomePage() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const tag = params.get('tag') ?? ''
+  const sort = params.get('sort') === 'popular' ? 'popular' : 'latest'
   const page = Math.max(1, Number(params.get('page')) || 1)
 
   const articles = useAsync(`articles?${params.toString()}`, (signal) =>
-    listArticles({ q, tag, page, pageSize: PAGE_SIZE }, signal),
+    listArticles({ q, tag, sort, page, pageSize: PAGE_SIZE }, signal),
   )
   const tags = useAsync('tags', listTags)
 
@@ -79,6 +80,21 @@ export function HomePage() {
           Search
         </button>
       </form>
+
+      <div className="mt-4 flex items-center gap-2 text-sm">
+        <label htmlFor="sort" className="text-muted">
+          Sort by
+        </label>
+        <select
+          id="sort"
+          value={sort}
+          onChange={(e) => update({ sort: e.target.value === 'popular' ? 'popular' : null })}
+          className="rounded-md border border-rule bg-white px-2 py-1"
+        >
+          <option value="latest">Latest</option>
+          <option value="popular">Most saved</option>
+        </select>
+      </div>
 
       {popularTags.length > 0 && (
         <section aria-labelledby="tags-heading" className="mt-6">

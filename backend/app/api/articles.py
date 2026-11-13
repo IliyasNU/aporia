@@ -5,10 +5,16 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, OptionalUser
 from app.db.session import DbSession
-from app.schemas.articles import ArticleCreate, ArticleListItem, ArticleOut, ArticleUpdate
+from app.schemas.articles import (
+    ArticleCreate,
+    ArticleDetail,
+    ArticleListItem,
+    ArticleOut,
+    ArticleUpdate,
+)
 from app.schemas.common import Page
 from app.schemas.errors import error_responses
-from app.services import articles
+from app.services import articles, social
 from app.services.articles import ArticleSort
 
 router = APIRouter(prefix="/articles", tags=["articles"])
@@ -27,7 +33,7 @@ def list_articles(
     page: PageNumber = 1,
     page_size: PageSize = 20,
 ) -> Page[ArticleListItem]:
-    """Public catalog of published articles, newest first."""
+    """Public catalog: newest first, or most bookmarked first with sort=popular."""
     items, total = articles.list_public_articles(
         db, q=q, tag=tag, author=author, sort=sort, page=page, page_size=page_size
     )
@@ -39,10 +45,16 @@ def list_articles(
     )
 
 
-@router.get("/{slug}", response_model=ArticleOut, responses=error_responses(404))
-def get_article(slug: str, db: DbSession, viewer: OptionalUser) -> ArticleOut:
-    """A published article. Its author can also open it while it is a draft or unpublished."""
-    return ArticleOut.model_validate(articles.get_article_by_slug(db, slug, viewer))
+@router.get("/{slug}", response_model=ArticleDetail, responses=error_responses(404))
+def get_article(slug: str, db: DbSession, viewer: OptionalUser) -> ArticleDetail:
+    """A published article. Its author can also open it while it is a draft, unpublished
+    or hidden by a moderator."""
+    article = articles.get_article_by_slug(db, slug, viewer)
+    return ArticleDetail(
+        **ArticleOut.model_validate(article).model_dump(),
+        bookmarked_by_me=social.is_bookmarked(db, viewer, article.id),
+        following_author=social.is_following(db, viewer, article.author_id),
+    )
 
 
 @router.post(

@@ -71,6 +71,15 @@ class ArticleOut(ArticleListItem):
 
     body_markdown: str
     created_at: datetime
+    # "hidden" when a moderator took it down; only its author still sees it.
+    moderation_status: str
+
+
+class ArticleDetail(ArticleOut):
+    """An article as seen by the current visitor."""
+
+    bookmarked_by_me: bool = False
+    following_author: bool = False
 
 
 class TagWithCount(TagOut):
