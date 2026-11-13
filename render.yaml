@@ -1,0 +1,56 @@
+# Render Blueprint: Aporia on Render's free plan, as one web service (the image from
+# deploy/Dockerfile: web app, API and email worker) and one free PostgreSQL database.
+#
+#   https://render.com/deploy?repo=https://github.com/IliyasNU/aporia
+#
+# What each value means, the free plan's limits and how to add email:
+# docs/deployment.md, section "Render (free plan)".
+services:
+  - type: web
+    name: aporia
+    runtime: docker
+    # Render picks a paid plan when this is left out.
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    # Deploy a commit of the main branch only after CI passed on it.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aporia-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      # Render's proxy appends to X-Forwarded-For; see docs/deployment.md.
+      - key: REAL_IP_HEADER
+        value: X-Forwarded-For
+      # Email is optional: without SMTP_HOST the site works and subscribing is off.
+      # The free plan blocks ports 25, 465 and 587, so use your provider's port 2525.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "2525"
+      - key: SMTP_STARTTLS
+        value: "true"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
+databases:
+  - name: aporia-db
+    # Free databases expire 30 days after creation (see docs/deployment.md).
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+    databaseName: aporia
+    user: aporia
+    # Reachable only from Render's private network, not from the internet.
+    ipAllowList: []

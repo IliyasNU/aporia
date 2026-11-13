@@ -5,10 +5,10 @@ readers follow authors, save essays, comment, subscribe to new essays by email a
 transparent recommendations that say why they were picked. Built with FastAPI, React and
 PostgreSQL. No paid services, no AI APIs, no trackers.
 
-> **Status: v1.0 release candidate.** Every requirement of the v1.0 specification is
-> implemented and tested (see [docs/roadmap.md](docs/roadmap.md) and the
-> [release checklist](docs/release-checklist.md)). The code lives in stacked pull requests
-> (Stage 0 to Stage 7) awaiting the owner's review; nothing is deployed publicly.
+> **Status: v1.0.0.** Every requirement of the v1.0 specification is implemented and
+> tested (see [docs/roadmap.md](docs/roadmap.md) and the
+> [release checklist](docs/release-checklist.md)), and it can be hosted for free on Render
+> with one click ([Deploy](#deploy)).
 
 ## What you can do
 
@@ -99,7 +99,17 @@ see `.env.example`). Every value has a working local default.
 | `LOG_LEVEL`                      | `INFO`                                                                                             |
 | `TEST_DATABASE_URL`              | `…/aporia_test`, used by pytest and wiped on every run                                             |
 
-Running it on a real server (HTTPS, SMTP, backups): [docs/deployment.md](docs/deployment.md).
+## Deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/IliyasNU/aporia)
+
+The button creates a free web service and a free PostgreSQL database from
+[`render.yaml`](render.yaml): the image in [`deploy/`](deploy/Dockerfile) runs nginx, the
+API and the email worker in one container. Free-plan limits (the site sleeps after 15
+idle minutes, the free database expires after 30 days, email needs a provider that
+accepts port 2525) and how to become an administrator are in
+[docs/deployment.md](docs/deployment.md#render-free-plan), as is running Aporia on your
+own server with Docker Compose (HTTPS, SMTP, backups).
 
 ## API
 
@@ -189,6 +199,9 @@ Backend tests need the `db` container (they create and wipe `aporia_test`).
 - Docker Compose from scratch: all images build, every service healthy, then
   `scripts/e2e_smoke.py`: register → publish → subscribe → confirm with the link from
   Mailpit → the worker emails the next essay → unsubscribe → recommendation with a reason.
+- The single-container image for Render, started the way Render runs it: the same
+  end-to-end chain, visitor addresses from `X-Forwarded-For`, and subscriptions switched
+  off without SMTP.
 
 **Checked by hand** (not repeated automatically):
 
@@ -221,9 +234,11 @@ The scenario-by-scenario list is in [docs/release-checklist.md](docs/release-che
 ```
 backend/      FastAPI app (app/), Alembic migrations, pytest suite
 frontend/     React + TypeScript + Vite + Tailwind single-page app, nginx config
+deploy/       single-container image for Render (nginx + API + worker)
 scripts/      e2e_smoke.py: end-to-end check against the running stack
 docs/         guides and decisions
 docker-compose.yml
+render.yaml   Render Blueprint (free web service and database)
 ```
 
 ## License

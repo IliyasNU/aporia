@@ -19,7 +19,8 @@ LOCAL_ORIGINS = [
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # A variable left blank (hosting dashboards often do that) means "use the default".
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -50,6 +51,10 @@ class Settings(BaseSettings):
     # Links in emails point here (the web app's public address).
     public_base_url: str = "http://localhost:8080"
 
+    # Off on a server without an SMTP account (deploy/start.sh turns it off when
+    # SMTP_HOST is not set): subscribing answers 503 and the worker sends nothing.
+    email_enabled: bool = True
+
     # Outgoing email. The defaults match Mailpit from docker-compose.yml.
     smtp_host: str = "localhost"
     smtp_port: int = 1025
@@ -74,6 +79,18 @@ class Settings(BaseSettings):
     # Touched after every worker loop; the container healthcheck reads its age.
     worker_heartbeat_file: str = "/tmp/aporia-worker-heartbeat"  # noqa: S108
     worker_heartbeat_max_age_seconds: int = Field(default=300, ge=10)
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_driver(cls, value: object) -> object:
+        # Hosting platforms hand out postgres:// or postgresql:// URLs; SQLAlchemy
+        # needs the driver in the scheme to pick psycopg 3.
+        url = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if isinstance(url, str):
+            for scheme in ("postgres://", "postgresql://"):
+                if url.startswith(scheme):
+                    return "postgresql+psycopg://" + url.removeprefix(scheme)
+        return value
 
     @field_validator("trusted_origins", mode="before")
     @classmethod

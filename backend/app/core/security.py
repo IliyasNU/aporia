@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import secrets
+import threading
 import uuid
 from functools import lru_cache
 
@@ -13,15 +14,21 @@ from app.core.config import get_settings
 
 # Argon2id with the library's recommended parameters (RFC 9106, low-memory profile).
 _hasher = PasswordHasher()
+# Each hash or check needs 64 MiB of memory. A small server (Render's free plan has
+# 512 MB) would run out if many sign-ins arrived at once, so at most two run at a
+# time and the others wait their turn.
+_argon2_slots = threading.BoundedSemaphore(2)
 
 
 def hash_password(password: str) -> str:
-    return _hasher.hash(password)
+    with _argon2_slots:
+        return _hasher.hash(password)
 
 
 def verify_password(password_hash: str, password: str) -> bool:
     try:
-        return _hasher.verify(password_hash, password)
+        with _argon2_slots:
+            return _hasher.verify(password_hash, password)
     except (VerificationError, InvalidHashError):
         return False
 
@@ -33,7 +40,7 @@ def password_needs_rehash(password_hash: str) -> bool:
 
 @lru_cache
 def _dummy_hash() -> str:
-    return _hasher.hash("not-a-real-password")
+    return hash_password("not-a-real-password")
 
 
 def burn_password_check_time(password: str) -> None:

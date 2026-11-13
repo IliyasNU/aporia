@@ -149,3 +149,36 @@ def test_oversized_bodies_are_refused_before_parsing(client: TestClient) -> None
 
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "payload_too_large"
+
+
+# --- Memory -------------------------------------------------------------------
+
+
+def test_at_most_two_password_hashes_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+    import time
+
+    from app.core import security
+
+    running = peak = 0
+    lock = threading.Lock()
+
+    class SlowHasher:
+        def hash(self, password: str) -> str:
+            nonlocal running, peak
+            with lock:
+                running += 1
+                peak = max(peak, running)
+            time.sleep(0.05)
+            with lock:
+                running -= 1
+            return "hashed"
+
+    monkeypatch.setattr(security, "_hasher", SlowHasher())
+    threads = [threading.Thread(target=security.hash_password, args=("pw",)) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert peak == 2
