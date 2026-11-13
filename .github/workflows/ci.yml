@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint, format, migrations, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aporia
+          POSTGRES_PASSWORD: aporia
+          POSTGRES_DB: aporia_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aporia -d aporia_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://aporia:aporia@localhost:5432/aporia_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Tests (include migration up/down and model drift check)
+        run: uv run pytest
+
+  frontend:
+    name: Frontend (lint, format, typecheck, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Format
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  smoke:
+    name: Docker Compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build images and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: API health (direct)
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/health
+      - name: API health (through the web container)
+        run: curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health
+      - name: Web serves the SPA
+        run: curl --fail --silent --show-error http://127.0.0.1:8080/ | grep -q '<div id="root">'
+      - name: Tag catalog is seeded
+        run: test "$(docker compose exec -T db psql -U aporia -tAc 'SELECT count(*) FROM tags')" = "7"
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
