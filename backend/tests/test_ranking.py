@@ -169,3 +169,51 @@ def test_cold_start_mixes_fresh_and_popular_and_new_essays_get_a_chance() -> Non
 
 def test_empty_input_gives_empty_output() -> None:
     assert rank([], Reader(), NOW) == []
+
+
+def naive_rank(candidates: list[Candidate], reader: Reader, now: datetime) -> list[uuid.UUID]:
+    """The plain O(n²) greedy definition: every step scores every remaining essay."""
+    from app.services.ranking import _total
+
+    most = max((c.bookmarks for c in candidates), default=0)
+    remaining, shown, order_ = list(candidates), set[str](), []
+
+    def key(c: Candidate) -> tuple[float, datetime, uuid.UUID]:
+        components = {
+            "interest": tag_match(c, reader),
+            "following": 1.0 if c.author_id in reader.following else 0.0,
+            "popularity": popularity(c.bookmarks, most),
+            "freshness": freshness(c.published_at, now),
+            "diversity": diversity(c, shown),
+        }
+        return (_total(components), c.published_at, c.id)
+
+    while remaining:
+        best = max(remaining, key=key)
+        order_.append(best.id)
+        shown |= best.tags.keys()
+        remaining.remove(best)
+    return order_
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_fast_ranking_matches_the_plain_definition(seed: int) -> None:
+    rnd = random.Random(seed)
+    slugs = ["ethics", "logic", "stoicism", "metaphysics", "epistemology"]
+    authors = [ANNA, BEA, CAL]
+    essays = [
+        essay(
+            f"s{seed}-{n}",
+            author=rnd.choice(authors),
+            days_old=rnd.choice([0, 1, 2, 5, 30, rnd.random() * 90]),
+            tags={t: t.title() for t in rnd.sample(slugs, rnd.randint(0, 3))},
+            bookmarks=rnd.choice([0, 0, 1, 3, 10, 40]),
+        )
+        for n in range(rnd.randint(1, 60))
+    ]
+    reader = Reader(
+        interests=frozenset(rnd.sample(slugs, rnd.randint(0, 2))),
+        following=frozenset(rnd.sample(authors, rnd.randint(0, 2))),
+    )
+
+    assert order(rank(essays, reader, NOW)) == naive_rank(essays, reader, NOW)

@@ -97,6 +97,17 @@ export function SignUpPage() {
           onChange={set('display_name')}
           error={fieldErrors.display_name}
         />
+        <p className="text-sm text-muted">
+          By creating an account you agree to the{' '}
+          <Link to="/rules" className="underline">
+            publication rules
+          </Link>{' '}
+          and the{' '}
+          <Link to="/privacy" className="underline">
+            privacy notice
+          </Link>
+          .
+        </p>
         <button type="submit" className={primaryButton} disabled={busy}>
           {busy ? 'Creating account…' : 'Create account'}
         </button>

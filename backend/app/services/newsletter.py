@@ -3,6 +3,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from email.message import EmailMessage
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -36,11 +37,12 @@ def unsubscribe_url(subscription_id: uuid.UUID) -> str:
     return f"{get_settings().public_base_url}/newsletter/unsubscribe#token={token}"
 
 
-def request_subscription(db: Session, author_id: uuid.UUID, email: str) -> None:
-    """Start (or restart) a subscription and email a confirmation link.
+def request_subscription(db: Session, author_id: uuid.UUID, email: str) -> EmailMessage | None:
+    """Start (or restart) a subscription; return the confirmation email to send, if any.
 
-    The caller always answers the same way, whatever happened here, so the
-    endpoint does not reveal whether an address is already subscribed.
+    The caller answers the same way whatever happens here and sends the email
+    after the response (see `send_confirmation`), so neither the answer nor its
+    timing reveals whether an address is already subscribed.
     """
     author = db.get(User, author_id)
     if author is None:
@@ -48,52 +50,67 @@ def request_subscription(db: Session, author_id: uuid.UUID, email: str) -> None:
     settings = get_settings()
     now = datetime.now(UTC)
 
-    subscription = db.scalar(
-        select(EmailSubscription).where(
+    # Create the row if needed, then lock it: concurrent requests for the same
+    # address queue up here instead of each sending a confirmation email.
+    new_id = uuid.uuid4()
+    db.execute(
+        insert(EmailSubscription)
+        .values(
+            id=new_id,
+            author_id=author_id,
+            email_normalized=email,
+            unsubscribe_token_hash=hash_token(unsubscribe_token(new_id)),
+        )
+        .on_conflict_do_nothing(constraint="uq_email_subscriptions_author_id")
+    )
+    subscription = db.execute(
+        select(EmailSubscription)
+        .where(
             EmailSubscription.author_id == author_id, EmailSubscription.email_normalized == email
         )
-    )
-    if subscription is None:
-        subscription = EmailSubscription(
-            id=uuid.uuid4(), author_id=author_id, email_normalized=email
-        )
-        subscription.unsubscribe_token_hash = hash_token(unsubscribe_token(subscription.id))
-        db.add(subscription)
-    elif subscription.status == SubscriptionStatus.CONFIRMED:
-        return  # already receiving emails: nothing to do, and nothing to reveal
-    elif (
-        subscription.status == SubscriptionStatus.PENDING
-        and subscription.confirmation_sent_at is not None
-        and now - subscription.confirmation_sent_at
+        .with_for_update()
+    ).scalar_one()
+    recently_sent = subscription.confirmation_sent_at is not None and (
+        now - subscription.confirmation_sent_at
         < timedelta(minutes=settings.newsletter_resend_minutes)
+    )
+    if subscription.status == SubscriptionStatus.CONFIRMED or (
+        subscription.status == SubscriptionStatus.PENDING and recently_sent
     ):
-        return  # a link was sent moments ago: do not let anyone flood an inbox (SEC-03)
+        # Already receiving emails, or a link went out moments ago: send nothing
+        # (no inbox flooding, SEC-03) and reveal nothing.
+        db.commit()
+        return None
 
     token = new_token()
     subscription.status = SubscriptionStatus.PENDING
     subscription.confirm_token_hash = hash_token(token)
     subscription.token_expires_at = now + timedelta(hours=settings.newsletter_confirm_ttl_hours)
+    subscription.confirmation_sent_at = now
     db.commit()
 
-    message = mailer.build_message(
+    # Only the author's @handle (letters, digits, underscores) goes into the email:
+    # display names are free text and must not let anyone write to strangers.
+    return mailer.build_message(
         to=email,
-        subject=f"Confirm your subscription to {author.display_name} on Aporia",
+        subject="Confirm your Aporia subscription",
         body=(
-            f"Someone, hopefully you, asked to receive new essays by {author.display_name} "
-            "on Aporia at this address.\n\n"
+            "Someone, hopefully you, asked to receive new essays by "
+            f"@{author.handle} on Aporia at this address.\n\n"
             f"Confirm the subscription:\n{confirm_url(token)}\n\n"
             f"The link expires in {settings.newsletter_confirm_ttl_hours} hours. "
             "If this was not you, ignore this email: you will not hear from us again.\n"
         ),
     )
+
+
+def send_confirmation(message: EmailMessage) -> None:
+    """Runs after the response has been sent. On failure the visitor can ask again
+    once NEWSLETTER_RESEND_MINUTES have passed; no address or token is logged."""
     try:
         mailer.send(message)
     except (mailer.TemporaryEmailError, mailer.PermanentEmailError) as exc:
-        # The visitor can simply ask again; no address or token in the log.
-        logger.warning("Confirmation email for subscription %s failed: %s", subscription.id, exc)
-        return
-    subscription.confirmation_sent_at = now
-    db.commit()
+        logger.warning("Confirmation email failed: %s", exc)
 
 
 def confirm(db: Session, token: str) -> EmailSubscription:

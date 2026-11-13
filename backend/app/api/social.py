@@ -6,6 +6,8 @@ from fastapi import APIRouter, status
 
 from app.api.articles import PageNumber, PageSize
 from app.api.deps import CurrentUser
+from app.core import rate_limit
+from app.core.rate_limit import limiter
 from app.db.session import DbSession
 from app.schemas.articles import ArticleListItem
 from app.schemas.common import Page
@@ -92,12 +94,13 @@ def list_comments(article_id: uuid.UUID, db: DbSession) -> list[CommentOut]:
     "/articles/{article_id}/comments",
     status_code=status.HTTP_201_CREATED,
     response_model=CommentOut,
-    responses=error_responses(401, 403, 404, 422),
+    responses=error_responses(401, 403, 404, 422, 429),
 )
 def add_comment(
     article_id: uuid.UUID, data: CommentIn, user: CurrentUser, db: DbSession
 ) -> CommentOut:
     """Comment on a published article (plain text, up to 2000 characters)."""
+    limiter.hit(rate_limit.COMMENT, str(user.id))
     return CommentOut.model_validate(comments.add_comment(db, user, article_id, data.text))
 
 

@@ -12,6 +12,10 @@ describe('safeNext', () => {
     ['//evil.example', '/'],
     ['/\\evil.example', '/'],
     ['javascript:alert(1)', '/'],
+    ['/%09/evil.example', '/'],
+    ['/%5Cevil.example', '/'],
+    ['/\tevil', '/'],
+    ['/write?draft=1#top', '/write?draft=1#top'],
   ])('%s -> %s', (next, expected) => {
     expect(safeNext(next)).toBe(expected)
   })

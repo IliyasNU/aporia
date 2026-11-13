@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.models import ReportTarget
 from app.schemas.articles import AuthorBrief
+from app.schemas.base import RequestModel
 
 CommentText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
@@ -22,7 +23,7 @@ class FollowedAuthor(BaseModel):
     created_at: datetime
 
 
-class CommentIn(BaseModel):
+class CommentIn(RequestModel):
     text: CommentText
 
 
@@ -37,7 +38,7 @@ class CommentOut(BaseModel):
     updated_at: datetime
 
 
-class ReportIn(BaseModel):
+class ReportIn(RequestModel):
     target_type: ReportTarget
     target_id: uuid.UUID
     reason: Reason
@@ -55,7 +56,20 @@ class ReportOut(BaseModel):
     created_at: datetime
 
 
-class ModerationIn(BaseModel):
+class ReportTargetInfo(BaseModel):
+    """What a report points at; None when the content was deleted for good."""
+
+    title: str | None = None  # articles
+    excerpt: str | None = None  # comments: the first 200 characters
+    url: str  # the essay page (for a comment: the essay it belongs to)
+    moderation_status: str
+
+
+class AdminReportOut(ReportOut):
+    target: ReportTargetInfo | None
+
+
+class ModerationIn(RequestModel):
     target_type: ReportTarget
     target_id: uuid.UUID
     action: Literal["hide", "unhide"]

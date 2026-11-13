@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import delete, exists, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from app.core.errors import AppError
 from app.models import Article, Bookmark, Follow, User
@@ -48,6 +48,7 @@ def list_following(db: Session, follower: User) -> list[Follow]:
         db.scalars(
             select(Follow)
             .join(Follow.author)
+            .options(contains_eager(Follow.author))  # authors come with the same query
             .where(Follow.follower_id == follower.id)
             .order_by(User.display_name, User.id)
         )

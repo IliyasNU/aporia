@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 
-engine = create_engine(get_settings().database_url.get_secret_value(), pool_pre_ping=True)
+# hide_parameters: error messages and logs never include query values
+# (emails, password hashes, tokens), only the SQL text (SEC-05).
+engine = create_engine(
+    get_settings().database_url.get_secret_value(), pool_pre_ping=True, hide_parameters=True
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

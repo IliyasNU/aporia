@@ -25,8 +25,10 @@ from app.models import (
     EmailJobStatus,
     EmailSubscription,
     SubscriptionStatus,
+    UserSession,
 )
 from app.services import mailer
+from app.services.maintenance import purge_deleted_content
 from app.services.newsletter import unsubscribe_url
 from app.services.visibility import publicly_visible
 
@@ -68,8 +70,12 @@ def _still_wanted(db: Session, job: EmailJob) -> bool:
     )
 
 
-def process_one(db: Session) -> bool:
-    """Send the next due job. Returns False when there is nothing to do."""
+def process_one(db: Session) -> str:
+    """Send the next due job.
+
+    Returns "idle" (nothing due), "sent", "cancelled", "failed" or "retry"
+    (a temporary SMTP problem; the job will be tried again later).
+    """
     settings = get_settings()
     now = datetime.now(UTC)
     job = db.scalar(
@@ -80,23 +86,26 @@ def process_one(db: Session) -> bool:
         .with_for_update(skip_locked=True)
     )
     if job is None:
-        return False
+        return "idle"
 
     if not _still_wanted(db, job):
         job.status = EmailJobStatus.CANCELLED
         db.commit()
         logger.info("Email job %s cancelled (unsubscribed or article not public)", job.id)
-        return True
+        return "cancelled"
 
     job.attempts += 1
+    outcome = "sent"
     try:
         mailer.send(_new_article_message(job))
     except mailer.PermanentEmailError as exc:
         job.status = EmailJobStatus.FAILED
         job.error_code = str(exc)
+        outcome = "failed"
         logger.error("Email job %s failed permanently: %s", job.id, exc)
     except mailer.TemporaryEmailError as exc:
         job.error_code = str(exc)
+        outcome = "retry"
         if job.attempts >= settings.worker_max_attempts:
             job.status = EmailJobStatus.FAILED
             logger.error("Email job %s gave up after %s attempts: %s", job.id, job.attempts, exc)
@@ -111,21 +120,30 @@ def process_one(db: Session) -> bool:
         job.error_code = None
         logger.info("Email job %s sent", job.id)
     db.commit()
-    return True
+    return outcome
 
 
 def run_batch(db: Session) -> int:
     """Send up to WORKER_BATCH_SIZE due emails, pausing between them. Returns how many."""
     settings = get_settings()
     handled = 0
-    while handled < settings.worker_batch_size and process_one(db):
+    while handled < settings.worker_batch_size:
+        outcome = process_one(db)
+        if outcome == "idle":
+            break
         handled += 1
+        if outcome == "retry":
+            # The mail server is down or refuses our login: stop this batch so
+            # one outage does not use up the attempts of every queued email.
+            break
         time.sleep(settings.worker_send_delay_seconds)
     return handled
 
 
 def clean_up(db: Session) -> None:
-    """Data minimisation (SEC-06): drop finished jobs and abandoned pending subscriptions."""
+    """Data minimisation (SEC-06): drop finished jobs, abandoned pending subscriptions,
+    sessions that ended more than a day ago, and content deleted or unsubscribed
+    more than DELETED_CONTENT_RETENTION_DAYS ago."""
     settings = get_settings()
     now = datetime.now(UTC)
     db.execute(
@@ -138,6 +156,13 @@ def clean_up(db: Session) -> None:
         delete(EmailSubscription).where(
             EmailSubscription.status == SubscriptionStatus.PENDING,
             EmailSubscription.token_expires_at < now - timedelta(days=7),
+        )
+    )
+    purge_deleted_content(db, now - timedelta(days=settings.deleted_content_retention_days))
+    day_ago = now - timedelta(days=1)
+    db.execute(
+        delete(UserSession).where(
+            (UserSession.expires_at < day_ago) | (UserSession.revoked_at < day_ago)
         )
     )
     db.commit()

@@ -5,11 +5,13 @@ never stack traces or other internal details.
 """
 
 import logging
+import traceback
 from http import HTTPStatus
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.schemas.errors import ErrorBody, ErrorResponse, ValidationIssue
@@ -20,11 +22,14 @@ logger = logging.getLogger(__name__)
 class AppError(Exception):
     """An expected failure with a specific error code, e.g. AppError(409, "email_taken", ...)."""
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self, status_code: int, code: str, message: str, headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers
 
 
 ERROR_CODES = {
@@ -34,6 +39,7 @@ ERROR_CODES = {
     404: "not_found",
     405: "method_not_allowed",
     409: "conflict",
+    413: "payload_too_large",
     422: "validation_error",
     429: "rate_limited",
     500: "internal_error",
@@ -64,7 +70,7 @@ def error_response(
 
 
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-    return error_response(exc.status_code, exc.message, code=exc.code)
+    return error_response(exc.status_code, exc.message, code=exc.code, headers=exc.headers)
 
 
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -87,7 +93,22 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
 
 
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    if isinstance(exc, DBAPIError):
+        # PostgreSQL error texts can quote the offending value (an email, a
+        # token...), so log the error class, SQLSTATE and where it happened,
+        # never the message itself (SEC-05).
+        diag = getattr(exc.orig, "diag", None)
+        logger.error(
+            "Database error %s (sqlstate %s, constraint %s) on %s %s\n%s",
+            type(exc.orig).__name__,
+            getattr(diag, "sqlstate", None),
+            getattr(diag, "constraint_name", None),
+            request.method,
+            request.url.path,
+            "".join(traceback.format_tb(exc.__traceback__)),
+        )
+    else:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return error_response(500, "Internal server error")
 
 

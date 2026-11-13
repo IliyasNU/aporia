@@ -20,6 +20,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.schemas.base import RequestModel
+
 Email = Annotated[EmailStr, Field(max_length=254), AfterValidator(str.lower)]
 # Long passphrases are welcome; the upper bound only stops absurd payloads.
 Password = Annotated[str, Field(min_length=8, max_length=128)]
@@ -31,18 +33,28 @@ Handle = Annotated[
 ]
 DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Bio = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+
+
+def _fits_column(url: HttpUrl) -> HttpUrl:
+    # Normalising can make a URL longer (e.g. "é" becomes "%C3%A9"), so check
+    # the final text against the 200-character column, not just the input.
+    if len(str(url)) > 200:
+        raise ValueError("URL should have at most 200 characters")
+    return url
+
+
 # HttpUrl only accepts http(s), so "javascript:" links cannot be stored.
-Website = Annotated[HttpUrl, UrlConstraints(max_length=200)]
+Website = Annotated[HttpUrl, UrlConstraints(max_length=200), AfterValidator(_fits_column)]
 
 
-class RegisterRequest(BaseModel):
+class RegisterRequest(RequestModel):
     email: Email
     password: Password
     handle: Handle
     display_name: DisplayName
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(RequestModel):
     email: Email
     # No minimum here: a wrong password must get the same 401 as any other.
     password: Annotated[str, Field(max_length=128)]
@@ -82,7 +94,7 @@ class MeOut(AuthorOut):
     interests: list[TagOut]
 
 
-class ProfileUpdate(BaseModel):
+class ProfileUpdate(RequestModel):
     """PATCH semantics: omitted fields stay unchanged; website=null removes it."""
 
     model_config = ConfigDict(extra="forbid")
@@ -99,7 +111,7 @@ class ProfileUpdate(BaseModel):
         return self
 
 
-class InterestsUpdate(BaseModel):
+class InterestsUpdate(RequestModel):
     tags: Annotated[list[Annotated[str, Field(max_length=64)]], Field(max_length=50)] = Field(
         description="Tag slugs. Replaces the whole list; an empty list clears it."
     )

@@ -57,7 +57,10 @@ def test_subscribe_creates_pending_subscription_and_sends_confirmation(
     assert subscription.email_normalized == "fan@example.com"
     [message] = outbox
     assert message["To"] == "fan@example.com"
-    assert "Simone Weil" in message["Subject"]
+    assert message["Subject"] == "Confirm your Aporia subscription"
+    # Only the @handle, never the free-text display name, reaches strangers' inboxes.
+    assert "@author" in message.get_content()
+    assert "Simone Weil" not in message.get_content()
     token = link_token(message, "confirm")
     # Only a hash of the token is stored.
     assert subscription.confirm_token_hash != token
@@ -114,16 +117,28 @@ def test_already_confirmed_address_gets_no_new_email(
     assert len(outbox) == 1
 
 
-def test_smtp_failure_still_answers_202_and_allows_retry(
-    visitor: TestClient, author: TestClient, outbox: Outbox, caplog: pytest.LogCaptureFixture
+def test_smtp_failure_still_answers_202_and_allows_retry_after_cooldown(
+    visitor: TestClient,
+    author: TestClient,
+    outbox: Outbox,
+    db_session: Session,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     outbox.failure = TemporaryEmailError("smtp_unavailable")
 
     assert subscribe(visitor, author).status_code == 202
+    assert "Confirmation email failed" in caplog.text
     assert "fan@example.com" not in caplog.text
 
     outbox.failure = None
-    subscribe(visitor, author)  # no cooldown: the first email never left
+    subscribe(visitor, author)
+    assert outbox == []  # within the cooldown nothing is sent, failed or not
+    db_session.execute(
+        update(EmailSubscription).values(
+            confirmation_sent_at=datetime.now(UTC) - timedelta(minutes=11)
+        )
+    )
+    subscribe(visitor, author)
     assert len(outbox) == 1
 
 
