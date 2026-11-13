@@ -16,6 +16,17 @@ from app.schemas.errors import ErrorBody, ErrorResponse, ValidationIssue
 
 logger = logging.getLogger(__name__)
 
+
+class AppError(Exception):
+    """An expected failure with a specific error code, e.g. AppError(409, "email_taken", ...)."""
+
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+
+
 ERROR_CODES = {
     400: "bad_request",
     401: "not_authenticated",
@@ -52,6 +63,10 @@ def error_response(
     )
 
 
+async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
+    return error_response(exc.status_code, exc.message, code=exc.code)
+
+
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     message = exc.detail if isinstance(exc.detail, str) else HTTPStatus(exc.status_code).phrase
     return error_response(exc.status_code, message, headers=exc.headers)
@@ -77,6 +92,7 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(AppError, handle_app_error)
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(Exception, handle_unexpected_error)

@@ -6,7 +6,7 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 | Stage | Scope                                                         | Requirements              | Status        |
 | ----- | ------------------------------------------------------------- | ------------------------- | ------------- |
 | 0     | Foundation: repo layout, settings, Compose, migrations, CI    | —                         | **In review** |
-| 1     | Accounts: register/login/logout, sessions, profile, interests | AUTH-01, AUTH-02, USER-01 | Not started   |
+| 1     | Accounts: register/login/logout, sessions, profile, interests | AUTH-01, AUTH-02, USER-01 | **In review** |
 | 2     | Publishing: articles, drafts, tags, search, public API        | ART-01, ART-02, ART-03    | Not started   |
 | 3     | Frontend: public pages, profiles, editor, personal area       | FE-01 … FE-05             | Not started   |
 | 4     | Social: follows, bookmarks, comments, moderation              | SOC-01, SOC-02, MOD-01    | Not started   |
@@ -25,3 +25,13 @@ owner's approval. Requirement IDs refer to the v1.0 product requirements.
 - `docker-compose.yml`: `db`, `migrate`, `api`, `web`.
 - CI: backend lint/format/tests, frontend lint/format/typecheck/tests/build, and a
   Docker Compose smoke test.
+
+## Stage 1: what exists
+
+- Migration `0002`: `users`, `sessions`, `user_interest_tags`.
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`,
+  `PATCH /me/profile`, `PUT /me/interests`, `GET /authors/{handle}`.
+- Argon2id password hashing, hashed server-side session tokens, `HttpOnly`/`SameSite=Lax`
+  cookies (`Secure` in production), Origin/Referer CSRF check on state-changing requests.
+- Not yet: rate limiting (Stage 7), the web UI for these features (Stage 3), the author's
+  article list on the public profile (Stage 2), admin assignment (Stage 4).

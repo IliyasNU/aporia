@@ -14,7 +14,7 @@ TEST_DATABASE_URL = os.environ.get(
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["APP_ENV"] = "test"
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pytest
 from alembic import command
@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.orm import Session
 
-from app.db.session import engine, get_db
+from app.db.session import SessionLocal, engine, get_db
 from app.main import app
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,7 +62,8 @@ def db_session() -> Iterator[Session]:
     """A session whose changes are rolled back after the test, even if the code commits."""
     connection = engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    # Same session settings as the app (SessionLocal), bound to the test transaction.
+    session = SessionLocal(bind=connection, join_transaction_mode="create_savepoint")
     try:
         yield session
     finally:
@@ -72,8 +73,42 @@ def db_session() -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Iterator[TestClient]:
+def make_client(db_session: Session) -> Iterator[Callable[[], TestClient]]:
+    """Factory for extra clients: each has its own cookie jar, i.e. its own browser."""
     app.dependency_overrides[get_db] = lambda: db_session
-    with TestClient(app) as test_client:
-        yield test_client
+    clients: list[TestClient] = []
+
+    def factory() -> TestClient:
+        test_client = TestClient(app)
+        clients.append(test_client)
+        return test_client
+
+    yield factory
+    for test_client in clients:
+        test_client.close()
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(make_client: Callable[[], TestClient]) -> TestClient:
+    return make_client()
+
+
+DEFAULT_PASSWORD = "correct horse battery staple"
+
+
+def register(
+    client: TestClient,
+    *,
+    email: str = "reader@example.com",
+    handle: str = "reader",
+    display_name: str = "Reader",
+    password: str = DEFAULT_PASSWORD,
+) -> dict[str, object]:
+    """Register through the API; the client is signed in afterwards."""
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "handle": handle, "display_name": display_name},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
