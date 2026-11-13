@@ -2,10 +2,23 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Index, String, Table, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Table,
+    Text,
+    and_,
+    func,
+    select,
+)
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.social import Bookmark, Comment, ModerationStatus
 from app.models.tag import Tag
 from app.models.user import User
 
@@ -52,3 +65,30 @@ class Article(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     author: Mapped[User] = relationship()
     tags: Mapped[list[Tag]] = relationship(secondary=article_tags, order_by=Tag.slug)
+
+
+# Loaded with every article: the forum's "Replies", "Saves" and "Last reply" columns.
+# Correlated subqueries, so a page of articles still takes a single query (no N+1).
+_visible_comment = and_(
+    Comment.article_id == Article.id,
+    Comment.deleted_at.is_(None),
+    Comment.moderation_status == ModerationStatus.VISIBLE,
+)
+Article.comment_count = column_property(
+    select(func.count(Comment.id))
+    .where(_visible_comment)
+    .correlate_except(Comment)
+    .scalar_subquery()
+)
+Article.last_comment_at = column_property(
+    select(func.max(Comment.created_at))
+    .where(_visible_comment)
+    .correlate_except(Comment)
+    .scalar_subquery()
+)
+Article.bookmark_count = column_property(
+    select(func.count())
+    .where(Bookmark.article_id == Article.id)
+    .correlate_except(Bookmark)
+    .scalar_subquery()
+)

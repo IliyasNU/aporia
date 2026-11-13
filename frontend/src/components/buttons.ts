@@ -1,6 +1,7 @@
+// Stack Exchange buttons: a solid blue primary, a light-blue secondary, a red outline.
 export const primaryButton =
-  'rounded-md bg-accent px-4 py-2 font-medium text-white hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-block rounded-[6px] border border-transparent bg-button px-[10.4px] py-[8px] text-[13px] leading-none font-normal text-white shadow-[inset_0_1px_0_0_hsla(0,0%,100%,0.4)] hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50'
 export const secondaryButton =
-  'rounded-md border border-rule bg-white px-4 py-2 font-medium hover:border-accent disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-block rounded-[6px] border border-[#7aa7c7] bg-tag px-[10.4px] py-[8px] text-[13px] leading-none font-normal text-tag-ink shadow-[inset_0_1px_0_0_hsla(0,0%,100%,0.7)] hover:bg-tag-hover hover:text-[#2c5877] disabled:cursor-not-allowed disabled:opacity-50'
 export const dangerButton =
-  'rounded-md border border-red-300 bg-white px-4 py-2 font-medium text-red-800 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-block rounded-[6px] border border-[#c22e32] bg-white px-[10.4px] py-[8px] text-[13px] leading-none text-[#c22e32] hover:bg-[#fdf2f2] disabled:cursor-not-allowed disabled:opacity-50'

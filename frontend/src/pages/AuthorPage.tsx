@@ -4,12 +4,13 @@ import { listArticles } from '../api/articles'
 import { ApiError } from '../api/client'
 import { getAuthor } from '../api/users'
 import { useAuth } from '../auth/context'
-import { ArticleCard } from '../components/ArticleCard'
 import { Avatar } from '../components/Avatar'
-import { Pagination } from '../components/Pagination'
 import { NewsletterForm } from '../components/NewsletterForm'
+import { Pagination } from '../components/Pagination'
+import { Panel } from '../components/Panel'
 import { Empty, ErrorState, Loading } from '../components/States'
 import { FollowButton } from '../components/ToggleButtons'
+import { TopicList } from '../components/TopicList'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { formatDate } from '../lib/format'
@@ -17,7 +18,7 @@ import { NotFoundPage } from './NotFoundPage'
 
 const PAGE_SIZE = 10
 
-/** FE-03: an author's public profile and published essays. */
+/** FE-03, as a forum member profile: who they are, email updates, the essays they started. */
 export function AuthorPage() {
   const { handle = '' } = useParams()
   const { user } = useAuth()
@@ -44,74 +45,74 @@ export function AuthorPage() {
   }
 
   const profile = author.data
+  const isSelf = user?.id === profile.id
   return (
-    <div>
-      <header className="flex flex-wrap items-start gap-4">
-        <Avatar name={profile.display_name} size="lg" />
-        <div className="min-w-0 flex-1">
-          <h1 className="font-serif text-3xl font-semibold">{profile.display_name}</h1>
-          <p className="text-muted">
-            @{profile.handle} · writing since {formatDate(profile.created_at)}
-          </p>
-          {profile.bio && <p className="mt-3 whitespace-pre-line">{profile.bio}</p>}
-          {profile.website && (
-            <p className="mt-2">
-              <a
-                href={profile.website}
-                rel="nofollow ugc noopener noreferrer"
-                className="break-all text-accent-strong underline"
-              >
-                {profile.website}
-              </a>
+    <div className="space-y-6">
+      <div>
+        <header className="flex flex-wrap items-start gap-4">
+          <Avatar name={profile.display_name} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[34px] leading-tight break-words">{profile.display_name}</h1>
+            <p className="mt-1 text-[13px] text-muted">
+              @{profile.handle} · Member since {formatDate(profile.created_at)}
             </p>
-          )}
-          {user?.id === profile.id ? (
-            <p className="mt-3">
-              <Link to="/account" className="font-medium text-accent-strong underline">
-                Edit your profile
-              </Link>
-            </p>
-          ) : (
-            <div className="mt-4">
-              <FollowButton
-                authorId={profile.id}
-                authorName={profile.display_name}
-                initial={profile.followed_by_me}
-              />
-            </div>
-          )}
-        </div>
-      </header>
+            {profile.bio && (
+              <p className="mt-3 max-w-[65ch] text-[15px] whitespace-pre-line">{profile.bio}</p>
+            )}
+            {profile.website && (
+              <p className="mt-2">
+                <a
+                  href={profile.website}
+                  rel="nofollow ugc noopener noreferrer"
+                  className="break-all text-accent hover:text-button"
+                >
+                  {profile.website}
+                </a>
+              </p>
+            )}
+            {isSelf ? (
+              <p className="mt-3">
+                <Link to="/account" className="font-medium text-accent-strong underline">
+                  Edit your profile
+                </Link>
+              </p>
+            ) : (
+              <div className="mt-4">
+                <FollowButton
+                  authorId={profile.id}
+                  authorName={profile.display_name}
+                  initial={profile.followed_by_me}
+                />
+              </div>
+            )}
+          </div>
+        </header>
+      </div>
 
-      {user?.id !== profile.id && (
-        <div className="mt-8">
-          <NewsletterForm authorId={profile.id} authorName={profile.display_name} />
-        </div>
-      )}
+      {!isSelf && <NewsletterForm authorId={profile.id} authorName={profile.display_name} />}
 
-      <section aria-labelledby="essays-heading" className="mt-10">
-        <h2
-          id="essays-heading"
-          className="border-b border-rule pb-2 text-sm font-semibold tracking-wide uppercase"
-        >
-          Essays
-        </h2>
-        {articles.status === 'loading' && <Loading label="Loading essays…" />}
+      <Panel title={`Essays by ${profile.display_name}`}>
+        {articles.status === 'loading' && (
+          <div className="px-4">
+            <Loading label="Loading essays…" />
+          </div>
+        )}
         {articles.status === 'error' && (
-          <div className="mt-4">
+          <div className="p-4">
             <ErrorState error={articles.error} onRetry={articles.reload} />
           </div>
         )}
         {articles.status === 'success' &&
           (articles.data.items.length === 0 ? (
-            <div className="mt-4">
+            <div className="p-4">
               <Empty>{profile.display_name} has not published any essays yet.</Empty>
             </div>
           ) : (
             <>
-              {articles.data.items.map((article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
+              <TopicList
+                label={`Essays by ${profile.display_name}`}
+                topics={articles.data.items.map((article) => ({ article }))}
+              />
               <Pagination
                 page={page}
                 pageSize={PAGE_SIZE}
@@ -120,7 +121,7 @@ export function AuthorPage() {
               />
             </>
           ))}
-      </section>
+      </Panel>
     </div>
   )
 }

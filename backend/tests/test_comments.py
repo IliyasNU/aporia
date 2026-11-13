@@ -130,3 +130,35 @@ def test_nobody_else_can_edit_or_delete_a_comment(
     assert other.patch(f"{API}/comments/{comment['id']}", json={"text": "Yours"}).status_code == 403
     assert other.delete(f"{API}/comments/{comment['id']}").status_code == 403
     assert [c["text"] for c in reader.get(comments_url(article)).json()] == ["Mine"]
+
+
+def test_article_lists_count_visible_comments_and_saves(
+    reader: TestClient,
+    article: dict[str, object],
+    make_client: Callable[[], TestClient],
+    db_session: Session,
+) -> None:
+    kept = reader.post(comments_url(article), json={"text": "Kept"}).json()
+    deleted = reader.post(comments_url(article), json={"text": "Deleted"}).json()
+    hidden = reader.post(comments_url(article), json={"text": "Hidden"}).json()
+    reader.delete(f"{API}/comments/{deleted['id']}")
+    db_session.execute(
+        update(Comment).where(Comment.id == hidden["id"]).values(moderation_status="hidden")
+    )
+    reader.post(f"{API}/articles/{article['id']}/bookmark")
+
+    listed = make_client().get(f"{API}/articles").json()["items"][0]
+    detail = make_client().get(f"{API}/articles/{article['slug']}").json()
+
+    for shown in (listed, detail):
+        assert (shown["comment_count"], shown["bookmark_count"]) == (1, 1)
+        assert shown["last_comment_at"] == kept["created_at"]
+
+
+def test_an_article_without_comments_has_no_last_comment(
+    article: dict[str, object], make_client: Callable[[], TestClient]
+) -> None:
+    listed = make_client().get(f"{API}/articles").json()["items"][0]
+
+    assert (listed["comment_count"], listed["bookmark_count"]) == (0, 0)
+    assert listed["last_comment_at"] is None

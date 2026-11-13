@@ -1,21 +1,43 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
-/* Editorial look: light paper background, dark ink, teal accent. */
+/* Stack Exchange look (their "Stacks" design system): system fonts, 13px interface
+   text, blue links and buttons, light-blue tags and an orange accent. */
 @theme {
-  --color-paper: #faf8f4;
-  --color-ink: #1f1d1a;
-  --color-muted: #5c5750;
-  --color-rule: #e4dfd6;
-  --color-accent: #0f766e;
-  --color-accent-strong: #115e59;
-  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --color-paper: #ffffff;
+  --color-ink: #232629;
+  --color-muted: #6a737c;
+  --color-rule: #d6d9dc;
+  --color-row: #f8f9f9;
+  --color-hover: #f1f2f3;
+  --color-accent: #0074cc;
+  --color-accent-strong: #0063bf;
+  --color-button: #0a95ff;
+  --color-orange: #f48225;
+  --color-tag: #e1ecf4;
+  --color-tag-hover: #d0e3f1;
+  --color-tag-ink: #39739d;
+  --color-owner: #d9eaf7;
+  --color-success: #2f6f44;
+  --color-note: #fdf7e2;
+  --color-note-rule: #f1e5bc;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI Adjusted', 'Segoe UI', 'Liberation Sans',
+    sans-serif;
+  --font-mono:
+    ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'Liberation Mono', Menlo, Monaco, Consolas,
+    monospace;
 }
 
 @layer base {
   html {
     background-color: var(--color-paper);
     color: var(--color-ink);
+  }
+
+  body {
+    font-size: 13px;
+    line-height: 1.4;
   }
 
   :focus-visible {

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { guest, makeArticle, mockApi, page, renderApp, tagCatalog } from '../test/api'
 
 describe('HomePage', () => {
-  it('shows a loading state, then article cards and popular tags', async () => {
+  it('shows a loading state, then essay summaries and popular tags', async () => {
     mockApi({
       'GET /auth/me': guest,
       'GET /articles': { status: 200, body: page([makeArticle()]) },
@@ -22,7 +22,28 @@ describe('HomePage', () => {
     expect(screen.getByText('Why certainty is overrated.')).toBeInTheDocument()
     // Popular tags: only tags with articles, most used first.
     const tags = await screen.findAllByRole('button', { pressed: false })
-    expect(tags.map((t) => t.textContent)).toEqual(['Logic 5', 'Epistemology 3'])
+    expect(tags.map((t) => t.textContent)).toEqual(['Logic × 5', 'Epistemology × 3'])
+  })
+
+  it('shows saves and comments beside each essay', async () => {
+    mockApi({
+      'GET /auth/me': guest,
+      'GET /articles': {
+        status: 200,
+        body: page([makeArticle({ comment_count: 2, bookmark_count: 1 })]),
+      },
+      'GET /tags': { status: 200, body: tagCatalog },
+    })
+
+    renderApp('/')
+
+    const list = await screen.findByRole('list', { name: 'Essays' })
+    expect(list).toHaveTextContent('1 save')
+    expect(list).toHaveTextContent('2 comments')
+    expect(within(list).getByRole('link', { name: 'Socrates' })).toHaveAttribute(
+      'href',
+      '/authors/socrates',
+    )
   })
 
   it('shows an empty state when nothing is published', async () => {
@@ -69,7 +90,7 @@ describe('HomePage', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search essays' }), 'doubt')
     await userEvent.click(screen.getByRole('button', { name: 'Search' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Logic 5' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Logic × 5' }))
     const pagination = await screen.findByRole('navigation', { name: 'Pagination' })
     await userEvent.click(within(pagination).getByRole('button', { name: 'Older →' }))
 

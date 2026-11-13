@@ -39,8 +39,8 @@ function TokenAction(props: {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <h1 className="font-serif text-3xl font-semibold">{props.title}</h1>
+    <div className="mx-auto max-w-md rounded-md border border-rule bg-white p-6 shadow-xs">
+      <h1 className="text-2xl font-bold sm:text-3xl">{props.title}</h1>
       {!token ? (
         <div className="mt-6">
           <Notice kind="error">

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Interface
+
+- A Stack Exchange-style look: their system font stack and 13px interface text, a top
+  bar with search, left navigation, a sidebar with popular tags, essay summaries with
+  save and comment counts, tag labels, and author cards on essays and comments.
+- Essay lists show how many comments and saves each essay has (`comment_count`,
+  `bookmark_count`, `last_comment_at` in every article list item, still one query per
+  page).
+
 ### Hosting
 
 - One-click deployment on Render's free plan: `render.yaml` (a free web service and a

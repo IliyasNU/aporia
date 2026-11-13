@@ -13,6 +13,8 @@ export function initials(name: string): string {
   const letters = name
     .trim()
     .split(/\s+/)
+    // Skip separators such as "·" or "-": "Demo · Ada" -> "DA".
+    .filter((word) => /^[\p{L}\p{N}]/u.test(word))
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
     .join('')

@@ -65,6 +65,10 @@ class ArticleListItem(BaseModel):
     tags: list[TagOut]
     published_at: datetime | None
     updated_at: datetime
+    # Visible comments, saves, and when the newest visible comment was written.
+    comment_count: int
+    bookmark_count: int
+    last_comment_at: datetime | None
 
 
 class ArticleOut(ArticleListItem):

@@ -6,8 +6,8 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 function Policy({ title, children }: { title: string; children: ReactNode }) {
   useDocumentTitle(title)
   return (
-    <article className="prose prose-stone max-w-none">
-      <h1 className="font-serif">{title}</h1>
+    <article className="prose prose-slate max-w-none rounded-md border border-rule bg-white p-6 shadow-xs">
+      <h1>{title}</h1>
       {children}
     </article>
   )
