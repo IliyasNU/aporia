@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.models import Tag, User
 from app.schemas.users import ProfileUpdate
+from app.services.tags import resolve_tags
 
 
 def get_author_by_handle(db: Session, handle: str) -> User:
@@ -23,13 +24,7 @@ def update_profile(db: Session, user: User, changes: ProfileUpdate) -> User:
 
 
 def set_interests(db: Session, user: User, slugs: list[str]) -> list[Tag]:
-    wanted = {slug.strip().lower() for slug in slugs}
-    tags = list(db.scalars(select(Tag).where(Tag.slug.in_(wanted)).order_by(Tag.slug)))
-
-    unknown = wanted - {tag.slug for tag in tags}
-    if unknown:
-        raise AppError(422, "unknown_tags", f"Unknown tags: {', '.join(sorted(unknown))}")
-
+    tags = resolve_tags(db, slugs)
     user.interests = tags
     db.commit()
     return tags

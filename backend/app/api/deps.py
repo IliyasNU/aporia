@@ -35,14 +35,20 @@ def clear_session_cookie(response: Response, settings: Settings) -> None:
     )
 
 
-def get_current_user(request: Request, db: DbSession) -> User:
-    """The signed-in user, or 401 for a missing, unknown, revoked or expired session."""
+def get_optional_user(request: Request, db: DbSession) -> User | None:
+    """The signed-in user, or None for guests (and for invalid sessions)."""
     token = request.cookies.get(SESSION_COOKIE)
     session = find_active_session(db, token) if token else None
-    if session is None:
+    return session.user if session else None
+
+
+def get_current_user(user: Annotated[User | None, Depends(get_optional_user)]) -> User:
+    """The signed-in user, or 401 for a missing, unknown, revoked or expired session."""
+    if user is None:
         raise AppError(401, "not_authenticated", "Sign in to continue")
-    return session.user
+    return user
 
 
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AppSettings = Annotated[Settings, Depends(get_settings)]

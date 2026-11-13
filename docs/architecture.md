@@ -84,3 +84,24 @@ The goal is a small, conventional and testable setup: no JWT, OAuth or refresh t
   The API never lets users change their own role, email or handle.
 - **Privacy:** the public author profile shows handle, display name, bio and website, never
   the email, role or interests.
+
+## Articles (Stage 2)
+
+- **Status** is `draft` → `published` ⇄ `unpublished`. Publishing is its own action
+  (`POST /articles/{id}/publish`), never a field in an edit. An empty body cannot be
+  published.
+- **Slugs** come from the title (`slugify`, keeps non-Latin letters) and get a short random
+  suffix when taken. While an article is a draft the slug follows the title; from the first
+  publication on it never changes, so shared links keep working.
+- **`published_at`** is the time of the first publication and is never reset. Stage 5 uses
+  it to send new-article emails exactly on the first publication, not on edits or
+  republishing.
+- **Soft delete** sets `deleted_at`. The row stays (comments, bookmarks and email jobs can
+  still reference it), but nobody, including the author, can open it again.
+- **Visibility** is defined once in `app/services/visibility.py`: published and not
+  deleted (Stage 4 adds "not hidden by a moderator"). Every public list, the search, tag
+  counts and later the feeds and recommendations use it.
+- **Markdown** is stored and returned as raw text. The API never renders HTML; the frontend
+  renders Markdown with raw HTML disabled (SEC-02).
+- **Lists** load authors with a join and tags with one extra `IN` query, so a page costs
+  the same number of SQL queries whatever its size (a test checks this).
